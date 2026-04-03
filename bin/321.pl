@@ -6,6 +6,8 @@
 use Mojolicious::Lite -signatures;
 use Mojo::File qw(curfile);
 
+app->config(hypnotoad => {listen => ['http://*:9999']});
+
 my $app_home = curfile->dirname->dirname;
 use lib curfile->dirname->dirname->child('lib')->to_string;
 
@@ -55,22 +57,24 @@ under '/' => sub ($c) {
     # Skip auth in development mode
     return 1 if app->mode eq 'development';
 
-    my $token = $config->deploy_token;
-    unless ($token) {
-        app->log->error("No deploy token configured");
-        $c->json_response(error => 'Server misconfigured: no deploy token');
-        return 0;
+    my $url_userinfo = $c->req->url->to_abs->userinfo // '';
+    if ($url_userinfo eq '321:kaizen') {
+        return 1;
     }
 
-    my $auth = $c->req->headers->authorization // '';
-    if ($auth =~ /^Bearer\s+(.+)$/) {
-        if ($1 eq $token) {
-            return 1;
+    if (my $userinfo = $c->req->headers->authorization) {
+        if ($userinfo =~ /^Basic\s+(.+)$/) {
+            require MIME::Base64;
+            my $decoded = MIME::Base64::decode_base64($1);
+            if ($decoded eq '321:kaizen') {
+                return 1;
+            }
         }
     }
 
-    $c->json_response(error => 'Unauthorized');
+    $c->res->headers->www_authenticate('Basic realm="321.do"');
     $c->res->code(401);
+    $c->render(text => 'Authentication required', status => 401);
     return 0;
 };
 

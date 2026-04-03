@@ -3,13 +3,13 @@ use warnings;
 use Test::More;
 use Test::Mojo;
 use Path::Tiny qw(path);
+use MIME::Base64;
 
-$ENV{DEPLOY_TOKEN} = 'test-token-123';
 $ENV{MOJO_MODE} = 'production';
 
 my $t = Test::Mojo->new(Mojo::File->new('bin/321.pl'));
 
-my $auth = { Authorization => 'Bearer test-token-123' };
+my $auth = { Authorization => 'Basic ' . encode_base64('321:kaizen', '') };
 
 # Logs without auth
 $t->get_ok('/service/123.api/logs')
