@@ -10,22 +10,46 @@ use File::Path qw(make_path);
 my $domain     = '321.do';
 my $app_port   = 9999;
 my $app_dir    = '/home/s3/321.do';
-my $user_home  = (getpwnam('nige'))[7] // '/home/nige';
+my $perl_ver   = 'perl-5.42.1';
+my $run_user   = 'nige';
+my $user_home  = (getpwnam($run_user))[7] // "/home/$run_user";
 my $nginx_conf = "/etc/nginx/sites-available/$domain";
 my $nginx_link = "/etc/nginx/sites-enabled/$domain";
 my $ubic_src   = "$app_dir/ubic/service/321";
 my $ubic_dest  = "$user_home/ubic/service/321";
+my $perlbrew   = "su - $run_user -c 'perlbrew exec --with $perl_ver";
 
 die "Must run as root (sudo)\n" unless $> == 0;
 
 say "=== 321.do installer ===\n";
 
-# --- Step 1: Install Perl dependencies ---
+# --- Step 1: Ensure perlbrew and required Perl version ---
+say "--- Checking perlbrew and Perl $perl_ver ---";
+
+my $has_perlbrew = system("su - $run_user -c 'which perlbrew'") == 0;
+unless ($has_perlbrew) {
+    say "Installing perlbrew...";
+    system("su - $run_user -c 'curl -L https://install.perlbrew.pl | bash'") == 0
+        or die "perlbrew installation failed\n";
+}
+
+my $has_perl = system("su - $run_user -c 'perlbrew list' | grep -q '$perl_ver'") == 0;
+unless ($has_perl) {
+    say "Installing $perl_ver (this may take a while)...";
+    system("su - $run_user -c 'perlbrew install $perl_ver'") == 0
+        or die "Failed to install $perl_ver\n";
+}
+
+# Ensure cpanm is available
+system("su - $run_user -c 'perlbrew install-cpanm'") == 0
+    or warn "cpanm install warning (may already exist)\n";
+
+# --- Step 2: Install Perl dependencies ---
 say "--- Installing Perl dependencies ---";
-system('cpanm --installdeps .') == 0
+system("$perlbrew cpanm --installdeps $app_dir'") == 0
     or die "cpanm failed\n";
 
-# --- Step 2: Create deploy token if missing ---
+# --- Step 3: Create deploy token if missing ---
 my $token_file = "$app_dir/deploy_token.txt";
 unless (-f $token_file) {
     say "--- Generating deploy token ---";
@@ -38,7 +62,7 @@ unless (-f $token_file) {
     say "Token: $token";
 }
 
-# --- Step 3: Write nginx config ---
+# --- Step 4: Write nginx config ---
 say "--- Writing nginx config ---";
 
 my $nginx = <<"NGINX";
@@ -77,7 +101,7 @@ print $fh $nginx;
 close $fh;
 say "Wrote $nginx_conf";
 
-# --- Step 4: Symlink to sites-enabled ---
+# --- Step 5: Symlink to sites-enabled ---
 if (-l $nginx_link) {
     unlink $nginx_link;
 }
@@ -85,7 +109,7 @@ symlink $nginx_conf, $nginx_link
     or die "Cannot symlink $nginx_link -> $nginx_conf: $!\n";
 say "Symlinked $nginx_link";
 
-# --- Step 5: SSL cert via certbot ---
+# --- Step 6: SSL cert via certbot ---
 unless (-f "/etc/letsencrypt/live/$domain/fullchain.pem") {
     say "--- Obtaining SSL certificate ---";
     system("certbot certonly --nginx -d $domain --non-interactive --agree-tos -m admin\@$domain") == 0
@@ -95,7 +119,7 @@ else {
     say "SSL cert already exists";
 }
 
-# --- Step 6: Test and reload nginx ---
+# --- Step 7: Test and reload nginx ---
 say "--- Testing nginx config ---";
 system('nginx -t') == 0
     or die "nginx config test failed\n";
@@ -104,7 +128,7 @@ say "--- Reloading nginx ---";
 system('systemctl reload nginx') == 0
     or die "nginx reload failed\n";
 
-# --- Step 7: Ubic service symlink ---
+# --- Step 8: Ubic service symlink ---
 say "--- Setting up ubic service ---";
 make_path($ubic_dest) unless -d $ubic_dest;
 my $ubic_link = "$ubic_dest/web";
@@ -115,17 +139,22 @@ symlink "$ubic_src/web", $ubic_link
     or die "Cannot symlink $ubic_link -> $ubic_src/web: $!\n";
 say "Symlinked $ubic_link";
 
-# --- Step 8: Start the app via ubic ---
+# Ensure Ubic is installed
+system("$perlbrew cpanm Ubic Ubic::Service::SimpleDaemon'") == 0
+    or die "Failed to install Ubic modules\n";
+
+# --- Step 9: Start the app via ubic ---
 say "--- Starting 321.do via ubic ---";
-system("su - nige -c 'ubic start 321.web'") == 0
+system("su - $run_user -c 'ubic start 321.web'") == 0
     or die "ubic start failed\n";
 
 say "\n=== 321.do installed ===";
 say "  https://$domain";
+say "  Perl:  $perl_ver (perlbrew)";
 say "  App running on port $app_port (managed by ubic)";
 say "  Nginx proxying 443 -> $app_port";
 say "";
-say "  ubic start 321.web";
-say "  ubic stop 321.web";
+say "  ubic start   321.web";
+say "  ubic stop    321.web";
 say "  ubic restart 321.web";
-say "  ubic status 321.web";
+say "  ubic status  321.web";
