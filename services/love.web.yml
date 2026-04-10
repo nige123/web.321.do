@@ -1,0 +1,35 @@
+bin: bin/app.pl
+branch: master
+name: love.web
+repo: /home/s3/love.honeywillow.com
+targets:
+    dev:
+        env: {}
+        logs: {}
+        port: "8888"
+        runner: morbo
+    live:
+        env: {}
+        logs: {}
+        port: "8888"
+        runner: hypnotoad
+sops:
+    kms: []
+    gcp_kms: []
+    azure_kv: []
+    hc_vault: []
+    age:
+        - recipient: age19ewwpe6626u470qdp5jhuheuekg7s6ak8gcntjmt20q64560ucfsny8efc
+          enc: |
+            -----BEGIN AGE ENCRYPTED FILE-----
+            YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBVbHRDOUk3TFR6c0kwMTlK
+            QWZLWjUrVGE4OFRBTXY3dGJ3ZHRyVmRIVlZRCkJxNDRtcHZrdXdrUzNaNUFrbmpR
+            ck5TSUVNNVZ1R2JHVUt2dlg0WWZzWW8KLS0tIHRXUlZLZmFxL1NwQ1p3VGV5bDlM
+            SDZLMURrYThiVjZTWWZLNkpxaWxjMTAKsaRF3ELZcdMshwotaQqJ4sl0zrpZcaLb
+            Vwf/I/7sNX1xloHscPZjSSL+91XP6c+zMn4XzHJjvTwcu0AJ+ydW4g==
+            -----END AGE ENCRYPTED FILE-----
+    lastmodified: "2026-04-10T06:58:40Z"
+    mac: ENC[AES256_GCM,data:1es6PyLw8hLeRsjjEcgsz5fkj0Np9AVuxJmp37OBCvQiBK2dmghOjhhlcP/U1lKXyIxNmb4Ng1Q1AU7n9AeoGsxvHIYAuI99fg3gRrWgyv8D7Oi7/v9BU+N/ozF/ywRVf97iz/KWEL8ZRlQuTParwakvGYumSiHQN1ie0N+Ss7k=,iv:NLbENDaBhx/P1SPJRFOK4hn9jDm2s3p93fkmEuTk0hA=,tag:nyURP06t0NPxDw3MswqwHA==,type:str]
+    pgp: []
+    encrypted_regex: ^(env)$
+    version: 3.9.4
