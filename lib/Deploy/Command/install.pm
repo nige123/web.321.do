@@ -69,9 +69,13 @@ sub run ($self, @args) {
             $self->nginx->reload;
         } else {
             my $hint = $provider eq 'mkcert'
-                ? "    brew install mkcert   # or: sudo apt install mkcert\n    mkcert -install\n"
+                ? "    # macOS:  brew install mkcert\n"
+                . "    # Linux:  sudo apt install libnss3-tools mkcert\n"
+                . "    mkcert -install\n"
                 : "    sudo certbot certonly --standalone -d $host\n";
-            warn "  [WARN] $provider failed:\n$hint";
+            warn "  [WARN] $provider failed:\n";
+            warn "    $_\n" for split /\n/, ($cert->{output} // '');
+            warn $hint;
         }
     } else {
         say "  [SKIP] No host/port, skipping nginx";
