@@ -65,4 +65,76 @@ subtest 'deploy returns the same step sequence as before the refactor' => sub {
         'full deploy emits the expected step list (skip_git)';
 };
 
+subtest '_step_migrate: success' => sub {
+    my ($home, $repo) = make_fixture();
+    path($repo, 'bin')->mkpath;
+    path($repo, 'bin/migrate')->spew_utf8('#!/bin/sh' . "\n" . 'echo "applying migration 001"' . "\n");
+    chmod 0755, "$repo/bin/migrate";
+
+    my $svc_mgr = Deploy::Service->new(
+        config => Deploy::Config->new(app_home => $home, target => 'live'),
+        log    => Mojo::Log->new(level => 'fatal'),
+    );
+    my $svc = $svc_mgr->config->service('demo.web');
+    my $s = $svc_mgr->_step_migrate($svc);
+
+    is $s->{step}, 'migrate',                'step name';
+    ok $s->{success},                         'success is truthy';
+    like $s->{output}, qr/applying migration 001/, 'migrate output captured';
+};
+
+subtest '_step_migrate: failure propagates non-zero exit' => sub {
+    my ($home, $repo) = make_fixture();
+    path($repo, 'bin')->mkpath;
+    path($repo, 'bin/migrate')->spew_utf8('#!/bin/sh' . "\n" . 'echo boom >&2' . "\n" . 'exit 7' . "\n");
+    chmod 0755, "$repo/bin/migrate";
+
+    my $svc_mgr = Deploy::Service->new(
+        config => Deploy::Config->new(app_home => $home, target => 'live'),
+        log    => Mojo::Log->new(level => 'fatal'),
+    );
+    my $svc = $svc_mgr->config->service('demo.web');
+    my $s = $svc_mgr->_step_migrate($svc);
+
+    ok !$s->{success},         'non-zero exit → success false';
+    like $s->{output}, qr/boom/, 'stderr captured in output';
+};
+
+subtest 'deploy runs bin/migrate when present' => sub {
+    my ($home, $repo) = make_fixture();
+    path($repo, 'bin')->mkpath;
+    path($repo, 'bin/migrate')->spew_utf8('#!/bin/sh' . "\n" . 'echo migrated' . "\n");
+    chmod 0755, "$repo/bin/migrate";
+    path($repo, 'ubic', 'service', 'demo')->mkpath;
+
+    my $cfg = Deploy::Config->new(app_home => $home, target => 'live');
+    my $svc_mgr = TestService->new(
+        config   => $cfg,
+        log      => Mojo::Log->new(level => 'fatal'),
+        ubic_mgr => Deploy::Ubic->new(config => $cfg),
+    );
+    my $r = $svc_mgr->deploy('demo.web', skip_git => 1);
+    my @steps = map { $_->{step} } @{ $r->{data}{steps} };
+    is_deeply \@steps,
+        [qw(apt_deps cpanm migrate generate_ubic ubic_restart port_check)],
+        'migrate slotted between cpanm and ubic_restart';
+};
+
+subtest 'deploy aborts before restart when migrate fails' => sub {
+    my ($home, $repo) = make_fixture();
+    path($repo, 'bin')->mkpath;
+    path($repo, 'bin/migrate')->spew_utf8('#!/bin/sh' . "\n" . 'exit 1' . "\n");
+    chmod 0755, "$repo/bin/migrate";
+
+    my $svc_mgr = TestService->new(
+        config => Deploy::Config->new(app_home => $home, target => 'live'),
+        log    => Mojo::Log->new(level => 'fatal'),
+    );
+    my $r = $svc_mgr->deploy('demo.web', skip_git => 1);
+    is $r->{status}, 'error',                      'deploy reports error';
+    like $r->{message}, qr/Migration failed/i,     'message names the failure';
+    my @steps = map { $_->{step} } @{ $r->{data}{steps} };
+    ok !(grep { $_ eq 'ubic_restart' } @steps),    'no restart after failed migrate';
+};
+
 done_testing;

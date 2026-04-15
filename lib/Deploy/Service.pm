@@ -119,6 +119,13 @@ sub _step_ubic_restart ($self, $name) {
     return { step => 'ubic_restart', success => $ok, output => $out };
 }
 
+sub _step_migrate ($self, $svc) {
+    my $repo = $svc->{repo};
+    my $env_prefix = "PERL5LIB=$repo/local/lib/perl5 PATH=$repo/local/bin:\$PATH";
+    my ($ok, $out) = $self->_run_in_dir($repo, "$env_prefix ./bin/migrate");
+    return { step => 'migrate', success => $ok, output => $out };
+}
+
 sub _step_port_check ($self, $svc) {
     my $ok = $self->_check_port($svc->{port});
     return {
