@@ -1,13 +1,12 @@
-
 use Ubic::Service::SimpleDaemon;
 
 my $LOG_ROOT = '/tmp';
 
-# start up 321.do (production)
+# 321.web (production via hypnotoad) — generated from services.yml
 Ubic::Service::SimpleDaemon->new(
     cwd         =>  '/home/s3/321.do',
-    bin         =>  'perlbrew exec --with perl-5.42.1 hypnotoad -f /home/s3/321.do/bin/321.pl',
-    stdout      =>  "$LOG_ROOT/321.do.stdout.log",
-    stderr      =>  "$LOG_ROOT/321.do.stderr.log",
-    ubic_log    =>  "$LOG_ROOT/321.do.ubic.log",
+    bin         =>  'perlbrew exec --with perl-5.42.1 env MOJO_MODE=production hypnotoad -f /home/s3/321.do/bin/321.pl',
+    stdout      =>  '/tmp/321.do.stdout.log',
+    stderr      =>  '/tmp/321.do.stderr.log',
+    ubic_log    =>  '/tmp/321.do.ubic.log',
 );

@@ -18,16 +18,18 @@ sub _services_dir ($self) {
     return path($self->app_home, 'services');
 }
 
+my $_sops_cache;
 sub _sops_path ($self) {
+    return $_sops_cache if defined $_sops_cache;
     for my $p ("$ENV{HOME}/bin/sops", '/usr/local/bin/sops', '/usr/bin/sops') {
-        return $p if -x $p;
+        return $_sops_cache = $p if -x $p;
     }
-    return undef;
+    return $_sops_cache = '';
 }
 
 sub _load_file_decrypted ($self, $file) {
     my $sops = $self->_sops_path;
-    if ($sops && $file->slurp_utf8 =~ /sops:/) {
+    if ($sops && length($sops) && $file->slurp_utf8 =~ /sops:/) {
         my $yaml = `$sops decrypt $file 2>/dev/null`;
         return LoadFile(\$yaml) if $? == 0 && $yaml;
     }
@@ -105,7 +107,9 @@ sub _resolve ($self, $name, $raw) {
         logs    => $target->{logs} // {},
         env     => $target->{env} // {},
         host    => $target->{host} // 'localhost',
-        ($raw->{perlbrew} ? (perlbrew => $raw->{perlbrew}) : ()),
+        ($target->{docs}  ? (docs  => $target->{docs})  : ()),
+        ($target->{admin} ? (admin => $target->{admin}) : ()),
+        ($raw->{perlbrew}  ? (perlbrew => $raw->{perlbrew}) : ()),
     };
 }
 

@@ -7,6 +7,7 @@ use Mojolicious::Lite -signatures;
 use Mojo::File qw(curfile);
 
 app->config(hypnotoad => {listen => ['http://127.0.0.1:9321']});
+push @{app->commands->namespaces}, 'Deploy::Command';
 
 my $app_home = curfile->dirname->dirname;
 use lib curfile->dirname->dirname->child('lib')->to_string;
@@ -15,6 +16,7 @@ use Deploy::Config;
 use Deploy::Service;
 use Deploy::Logs;
 use Deploy::Ubic;
+use Deploy::Nginx;
 
 # --- Config ---
 
@@ -35,15 +37,38 @@ my $logs_mgr = Deploy::Logs->new(
     config => $config,
 );
 
+my $nginx_mgr = Deploy::Nginx->new(
+    config => $config,
+    log    => app->log,
+);
+
 # --- Helpers ---
 
-helper config   => sub { $config };
-helper svc_mgr  => sub { $service_mgr };
-helper log_mgr  => sub { $logs_mgr };
-helper ubic_mgr => sub { $ubic_mgr };
+# App-level accessors for command modules
+app->attr(config_obj    => sub { $config });
+app->attr(ubic_mgr_obj  => sub { $ubic_mgr });
+app->attr(nginx_mgr_obj => sub { $nginx_mgr });
+app->attr(svc_mgr_obj   => sub { $service_mgr });
+
+helper config    => sub { $config };
+helper svc_mgr   => sub { $service_mgr };
+helper log_mgr   => sub { $logs_mgr };
+helper ubic_mgr  => sub { $ubic_mgr };
+helper nginx_mgr => sub { $nginx_mgr };
+
+helper active_target => sub ($c) {
+    return $c->cookie('target') // (app->mode eq 'development' ? 'dev' : 'live');
+};
 
 helper json_response => sub ($c, $status, $message, $data = {}) {
     $c->render(json => { status => $status, message => $message, data => $data });
+};
+
+helper git_commit => sub ($self, $file, $msg) {
+    system('git', '-C', $app_home, 'add', $file) == 0
+        or app->log->warn("git add failed for $file");
+    system('git', '-C', $app_home, 'commit', '-m', $msg, '--', $file) == 0
+        or app->log->warn("git commit failed: $msg");
 };
 
 helper validate_service => sub ($c, $name) {
@@ -57,6 +82,9 @@ helper validate_service => sub ($c, $name) {
 # --- Auth ---
 
 under '/' => sub ($c) {
+    # Set config target from cookie (defaults: dev in development, live in production)
+    $config->target($c->active_target);
+
     my $path = $c->req->url->path->to_string;
 
     # /health is public
@@ -139,6 +167,24 @@ post '/service/#name/deploy-dev' => sub ($c) {
     $c->render(json => $result);
 };
 
+# Start/stop/restart a service via ubic
+for my $action (qw(start stop restart)) {
+    post "/service/#name/$action" => sub ($c) {
+        my $name = $c->param('name');
+        return unless $c->validate_service($name);
+
+        app->log->info("$action requested for $name");
+        my $output = `ubic $action $name 2>&1`;
+        my $ok = $? == 0;
+        my $label = ucfirst($action);
+        $c->json_response(
+            ($ok ? 'success' : 'error'),
+            ($ok ? "$label $name" : "$label failed for $name"),
+            { output => $output },
+        );
+    };
+}
+
 # Tail logs
 get '/service/#name/logs' => sub ($c) {
     my $name = $c->param('name');
@@ -215,11 +261,7 @@ post '/service/#name/config' => sub ($c) {
     app->log->info("Config update for $name");
     my $file = $config->save_service($name, $data);
 
-    # Auto-commit
-    my $msg = "Update config: $name";
-    system('git', '-C', $app_home, 'add', "services/$name.yml");
-    system('git', '-C', $app_home, 'commit', '-m', $msg, '--', "services/$name.yml");
-
+    $c->git_commit("services/$name.yml", "Update config: $name");
     $c->json_response(success => "Config saved for $name", { file => "$file" });
 };
 
@@ -235,9 +277,7 @@ post '/services/create' => sub ($c) {
     app->log->info("Creating service: $name");
     my $file = $config->save_service($name, $data);
 
-    # Auto-commit
-    system('git', '-C', $app_home, 'add', "services/$name.yml");
-    system('git', '-C', $app_home, 'commit', '-m', "Add service: $name", '--', "services/$name.yml");
+    $c->git_commit("services/$name.yml", "Add service: $name");
 
     # Generate ubic file
     if ($ubic_mgr) {
@@ -256,9 +296,7 @@ post '/service/#name/delete' => sub ($c) {
     app->log->info("Deleting service: $name");
     $config->delete_service($name);
 
-    # Auto-commit
-    system('git', '-C', $app_home, 'add', '-u', "services/$name.yml");
-    system('git', '-C', $app_home, 'commit', '-m', "Remove service: $name", '--', "services/$name.yml");
+    $c->git_commit("services/$name.yml", "Remove service: $name");
 
     $c->json_response(success => "Service $name deleted");
 };
@@ -286,6 +324,68 @@ post '/git/push' => sub ($c) {
     } else {
         $c->json_response(error => 'Push failed', { output => $output });
     }
+};
+
+# --- Nginx management ---
+
+get '/service/#name/nginx' => sub ($c) {
+    my $name = $c->param('name');
+    return unless $c->validate_service($name);
+    my $status = $nginx_mgr->status($name);
+    $c->json_response(success => "Nginx status for $name", $status);
+};
+
+post '/service/#name/nginx/setup' => sub ($c) {
+    my $name = $c->param('name');
+    return unless $c->validate_service($name);
+
+    app->log->info("Nginx setup for $name");
+    my $result = $nginx_mgr->setup($name);
+    my $ok = $result->{status} eq 'ok';
+    $c->render(json => {
+        status  => $ok ? 'success' : 'error',
+        message => $result->{message},
+        data    => { steps => $result->{steps} },
+    });
+};
+
+post '/service/#name/nginx/certbot' => sub ($c) {
+    my $name = $c->param('name');
+    return unless $c->validate_service($name);
+
+    app->log->info("Certbot for $name");
+    my $result = $nginx_mgr->certbot($name);
+
+    if ($result->{status} eq 'ok') {
+        # Regenerate config with SSL and reload
+        $nginx_mgr->generate($name);
+        $nginx_mgr->reload;
+        $c->json_response(success => "SSL certificate obtained", $result);
+    } else {
+        $c->json_response(error => "Certbot failed", $result);
+    }
+};
+
+# --- Target switch ---
+
+post '/target' => sub ($c) {
+    my $target = $c->req->json->{target} // 'live';
+    $target = 'live' unless $target =~ /^[a-z]+$/;
+    $c->cookie(target => $target, { path => '/', expires => time + 86400 * 365 });
+    $config->target($target);
+    $c->json_response(success => "Switched to $target", { target => $target });
+};
+
+get '/target' => sub ($c) {
+    my $target = $c->active_target;
+    my $raw = $config->services;
+    my @available;
+    for my $name (sort keys %$raw) {
+        push @available, sort keys %{ $raw->{$name}{targets} // {} };
+    }
+    my %seen;
+    @available = grep { !$seen{$_}++ } @available;
+    $c->json_response(success => "Active target", { target => $target, available => \@available });
 };
 
 # --- UI Routes ---
@@ -359,7 +459,7 @@ body {
     background-size: 100% 100%, 48px 48px, 48px 48px;
     color: var(--text-0);
     font-family: var(--mono);
-    font-size: 16px;
+    font-size: 18px;
     line-height: 1.5;
     min-height: 100vh;
     overflow-x: hidden;
@@ -458,7 +558,7 @@ body::after {
 
 .mission-title {
     font-family: var(--display);
-    font-size: 11px;
+    font-size: 15px;
     font-weight: 500;
     letter-spacing: 4px;
     color: var(--text-2);
@@ -468,7 +568,7 @@ body::after {
 
 .dev-badge {
     font-family: var(--display);
-    font-size: 9px;
+    font-size: 11px;
     font-weight: 700;
     color: var(--dev);
     background: var(--dev-glow);
@@ -479,7 +579,7 @@ body::after {
 
 .mission-clock {
     font-family: var(--display);
-    font-size: 13px;
+    font-size: 15px;
     font-weight: 400;
     color: var(--phosphor-mid);
     letter-spacing: 2px;
@@ -488,7 +588,7 @@ body::after {
 }
 
 .health-badge {
-    font-size: 13px;
+    font-size: 15px;
     padding: 4px 12px;
     display: flex;
     align-items: center;
@@ -511,8 +611,43 @@ body::after {
     animation: alert-flash 2s ease-in-out infinite;
 }
 
-.git-badge {
+.target-switch {
+    display: flex;
+    background: var(--void);
+    padding: 2px;
+    gap: 1px;
+}
+
+.target-btn {
+    font-family: var(--display);
     font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    padding: 4px 14px;
+    border: none;
+    background: transparent;
+    color: var(--text-2);
+    cursor: pointer;
+    transition: all 0.2s;
+    text-transform: uppercase;
+}
+
+.target-btn:hover { color: var(--text-1); }
+
+.target-btn.active-live {
+    background: var(--phosphor-faint);
+    color: var(--phosphor);
+    text-shadow: 0 0 8px var(--phosphor-glow);
+}
+
+.target-btn.active-dev {
+    background: rgba(179, 136, 255, 0.15);
+    color: var(--dev);
+    text-shadow: 0 0 8px var(--dev-glow);
+}
+
+.git-badge {
+    font-size: 16px;
     padding: 4px 12px;
     display: flex;
     align-items: center;
@@ -578,7 +713,7 @@ body::after {
 }
 
 .page-subtitle {
-    font-size: 14px;
+    font-size: 16px;
     color: var(--text-2);
     letter-spacing: 2px;
     text-transform: uppercase;
@@ -723,7 +858,7 @@ body::after {
 
 .mode-badge {
     font-family: var(--display);
-    font-size: 9px;
+    font-size: 11px;
     font-weight: 700;
     letter-spacing: 2px;
     padding: 2px 8px;
@@ -750,13 +885,13 @@ body::after {
     display: grid;
     grid-template-columns: auto 1fr;
     gap: 4px 16px;
-    font-size: 14px;
+    font-size: 16px;
     margin-bottom: 16px;
 }
 
 .svc-meta dt {
     color: var(--text-2);
-    font-size: 11px;
+    font-size: 15px;
     letter-spacing: 2px;
     text-transform: uppercase;
     padding-top: 2px;
@@ -764,7 +899,7 @@ body::after {
 
 .svc-meta dd {
     color: var(--phosphor-mid);
-    font-size: 14px;
+    font-size: 16px;
 }
 
 /* ═══ CONTROLS ═══ */
@@ -774,11 +909,12 @@ body::after {
     gap: 8px;
     padding-top: 16px;
     border-top: 1px solid var(--border);
+    flex-wrap: wrap;
 }
 
 .btn {
     font-family: var(--mono);
-    font-size: 13px;
+    font-size: 15px;
     letter-spacing: 1px;
     text-transform: uppercase;
     padding: 7px 14px;
@@ -799,10 +935,37 @@ body::after {
     border-color: var(--border-hi);
 }
 
+.svc-controls {
+    border-top: none;
+    padding-top: 4px;
+}
+
+.btn-ctrl {
+    font-size: 13px;
+    letter-spacing: 2px;
+    padding: 5px 10px;
+}
+
+.btn-tint {
+    color: var(--btn-c);
+    border-color: var(--btn-b);
+}
+
+.btn-tint:hover {
+    color: var(--btn-c);
+    background: var(--btn-g);
+    border-color: var(--btn-c);
+}
+
+.btn-stop   { --btn-c: var(--red);   --btn-b: rgba(255,0,51,0.2);   --btn-g: var(--red-glow); }
+.btn-docs   { --btn-c: var(--amber); --btn-b: rgba(255,160,0,0.2);  --btn-g: var(--amber-glow); }
+.btn-admin  { --btn-c: var(--dev);   --btn-b: rgba(179,136,255,0.2); --btn-g: var(--dev-glow); }
+.btn-visit  { --btn-c: var(--cyan);  --btn-b: rgba(0,229,255,0.2);  --btn-g: var(--cyan-glow); }
+
 .btn-deploy {
     font-family: var(--display);
     font-weight: 700;
-    font-size: 11px;
+    font-size: 15px;
     letter-spacing: 3px;
     padding: 10px 20px;
     background: rgba(0, 255, 65, 0.05);
@@ -850,7 +1013,7 @@ body::after {
 .btn-deploy-dev {
     font-family: var(--display);
     font-weight: 700;
-    font-size: 11px;
+    font-size: 15px;
     letter-spacing: 3px;
     padding: 10px 20px;
     background: rgba(179, 136, 255, 0.05);
@@ -903,7 +1066,7 @@ body::after {
     background: var(--void);
     border: 1px solid var(--border);
     padding: 12px 14px;
-    font-size: 13px;
+    font-size: 15px;
     line-height: 1.8;
     max-height: 200px;
     overflow-y: auto;
@@ -944,7 +1107,7 @@ body::after {
 
 .log-type-tab {
     font-family: var(--mono);
-    font-size: 13px;
+    font-size: 15px;
     padding: 5px 12px;
     border: none;
     background: transparent;
@@ -971,7 +1134,7 @@ body::after {
 
 .log-search input {
     font-family: var(--mono);
-    font-size: 14px;
+    font-size: 16px;
     padding: 5px 10px;
     background: var(--void);
     border: 1px solid var(--border);
@@ -991,7 +1154,7 @@ body::after {
 
 .log-content {
     padding: 14px;
-    font-size: 13px;
+    font-size: 15px;
     line-height: 1.7;
     max-height: 500px;
     overflow-y: auto;
@@ -1017,7 +1180,7 @@ body::after {
     padding: 40px 0;
     letter-spacing: 2px;
     text-transform: uppercase;
-    font-size: 13px;
+    font-size: 15px;
 }
 
 /* ═══ DIAGNOSTICS ═══ */
@@ -1037,7 +1200,7 @@ body::after {
 
 .analysis-card h3 {
     font-family: var(--display);
-    font-size: 10px;
+    font-size: 12px;
     font-weight: 600;
     letter-spacing: 3px;
     text-transform: uppercase;
@@ -1051,7 +1214,7 @@ body::after {
     align-items: center;
     padding: 6px 0;
     border-bottom: 1px solid rgba(0, 255, 65, 0.04);
-    font-size: 14px;
+    font-size: 16px;
 }
 
 .stat-row:last-child { border-bottom: none; }
@@ -1068,7 +1231,7 @@ body::after {
 }
 
 .status-code-chip {
-    font-size: 14px;
+    font-size: 16px;
     padding: 4px 10px;
     display: flex;
     gap: 6px;
@@ -1141,13 +1304,13 @@ body::after {
     display: grid;
     grid-template-columns: auto 1fr;
     gap: 8px 16px;
-    font-size: 14px;
+    font-size: 16px;
     margin-bottom: 20px;
 }
 
 .detail-meta dt {
     color: var(--text-2);
-    font-size: 11px;
+    font-size: 15px;
     letter-spacing: 2px;
     text-transform: uppercase;
     padding-top: 2px;
@@ -1155,13 +1318,13 @@ body::after {
 
 .detail-meta dd {
     color: var(--phosphor-mid);
-    font-size: 14px;
+    font-size: 16px;
     word-break: break-all;
 }
 
 .section-title {
     font-family: var(--display);
-    font-size: 12px;
+    font-size: 16px;
     font-weight: 600;
     letter-spacing: 3px;
     text-transform: uppercase;
@@ -1205,7 +1368,7 @@ body::after {
 
 .config-target-tab {
     font-family: var(--mono);
-    font-size: 13px;
+    font-size: 15px;
     padding: 5px 12px;
     border: none;
     background: transparent;
@@ -1237,7 +1400,7 @@ body::after {
 }
 
 .config-label {
-    font-size: 11px;
+    font-size: 15px;
     letter-spacing: 2px;
     text-transform: uppercase;
     color: var(--text-2);
@@ -1245,7 +1408,7 @@ body::after {
 
 .config-input {
     font-family: var(--mono);
-    font-size: 14px;
+    font-size: 16px;
     padding: 6px 10px;
     background: var(--panel);
     border: 1px solid var(--border);
@@ -1264,9 +1427,16 @@ body::after {
     color: var(--amber);
 }
 
+.btn-save-dirty {
+    color: var(--amber);
+    border-color: var(--amber);
+    background: var(--amber-glow);
+    animation: deploy-pulse 1.5s ease-in-out infinite;
+}
+
 .config-section-label {
     font-family: var(--display);
-    font-size: 10px;
+    font-size: 12px;
     font-weight: 600;
     letter-spacing: 3px;
     color: var(--text-2);
@@ -1277,10 +1447,25 @@ body::after {
 
 /* ═══ ADD SUBSYSTEM ═══ */
 
+.add-subsystem-form {
+    background: var(--panel);
+    border: 1px dashed var(--border-hi);
+    padding: 20px;
+}
+
+.add-form-title {
+    font-family: var(--display);
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    color: var(--text-2);
+    margin-bottom: 16px;
+}
+
 .add-subsystem-btn {
     font-family: var(--display);
     font-weight: 700;
-    font-size: 11px;
+    font-size: 15px;
     letter-spacing: 3px;
     padding: 12px 24px;
     background: transparent;
@@ -1315,7 +1500,7 @@ body::after {
 }
 
 .toast {
-    font-size: 13px;
+    font-size: 15px;
     padding: 10px 16px;
     border: 1px solid var(--border);
     background: var(--panel);
@@ -1434,6 +1619,7 @@ body::after {
     <div class="dev-badge">DEV MODE</div>
 % }
     <div class="mission-title">MISSION CONTROL</div>
+    <div class="target-switch" id="target-switch"></div>
     <div class="mission-clock" id="mission-clock">--:--:--</div>
     <div id="git-badge" class="git-badge synced" onclick="gitPush()" title="Click to push">
         <span id="git-status">SYNCED</span>
@@ -1557,8 +1743,36 @@ async function gitPush() {
     loadGitStatus();
 }
 
+async function loadTargets() {
+    try {
+        const d = await api('/target');
+        if (d.status !== 'success') return;
+        const sw = document.getElementById('target-switch');
+        const active = d.data.target;
+        sw.innerHTML = '';
+        d.data.available.forEach(t => {
+            const btn = document.createElement('button');
+            btn.className = 'target-btn' + (t === active ? ' active-' + t : '');
+            btn.textContent = t;
+            btn.onclick = () => switchTarget(t);
+            sw.appendChild(btn);
+        });
+    } catch(e) {}
+}
+
+async function switchTarget(target) {
+    await api('/target', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ target: target }),
+    });
+    loadTargets();
+    location.reload();
+}
+
 loadHealth();
 loadGitStatus();
+loadTargets();
 updateClock();
 setInterval(loadHealth, 15000);
 setInterval(loadGitStatus, 15000);
@@ -1589,6 +1803,10 @@ setInterval(updateClock, 1000);
 % content_for scripts => begin
 <script>
 async function loadServices() {
+    // Don't clobber the form if the user is typing in it
+    const addName = document.getElementById('add-name');
+    if (addName && addName.value.trim()) return;
+
     const d = await api('/services');
     if (d.status !== 'success') return;
     const grid = document.getElementById('svc-grid');
@@ -1601,9 +1819,9 @@ async function loadServices() {
         card.style.animationDelay = (idx * 0.08) + 's';
         const modeBadge = isDev
             ? '<span class="mode-badge dev">DEV</span>'
-            : '<span class="mode-badge prod">PROD</span>';
+            : '<span class="mode-badge prod">LIVE</span>';
         const deployBtnClass = isDev ? 'btn btn-deploy-dev' : 'btn btn-deploy';
-        const deployLabel = isDev ? 'LAUNCH DEV' : 'LAUNCH';
+        const deployLabel = isDev ? 'DEPLOY DEV' : 'DEPLOY';
         card.innerHTML = `
             <div class="svc-header">
                 <div class="svc-name"><a href="/ui/service/${svc.name}">${svc.name}</a>${modeBadge}</div>
@@ -1617,11 +1835,19 @@ async function loadServices() {
                 <dt>RUNNER</dt><dd>${svc.runner || '\u2014'}</dd>
             </dl>
             <div class="svc-actions">
+                <a href="https://${svc.host || 'localhost'}" target="_blank" class="btn btn-tint btn-visit">VISIT</a>
+                ${svc.docs ? '<a href="' + svc.docs + '" target="_blank" class="btn btn-tint btn-docs">DOCS</a>' : ''}
+                ${svc.admin ? '<a href="' + svc.admin + '" target="_blank" class="btn btn-tint btn-admin">ADMIN</a>' : ''}
+                <a href="/ui/service/${svc.name}#logs" class="btn">LOGS</a>
+                <a href="/ui/service/${svc.name}" class="btn">CONFIG</a>
+            </div>
+            <div class="svc-actions svc-controls">
+                <button class="btn btn-ctrl" onclick="svcAction('${svc.name}','start')">START</button>
+                <button class="btn btn-ctrl" onclick="svcAction('${svc.name}','restart')">RESTART</button>
+                <button class="btn btn-ctrl btn-tint btn-stop" onclick="svcAction('${svc.name}','stop')">STOP</button>
                 <button class="${deployBtnClass}" onclick="deployService('${svc.name}', this, ${isDev})" id="deploy-btn-${svc.name.replace(/\./g,'_')}">
                     ${deployLabel}
                 </button>
-                <a href="/ui/service/${svc.name}" class="btn">DETAIL</a>
-                <a href="/ui/service/${svc.name}#logs" class="btn">LOGS</a>
             </div>
             <div class="deploy-output" id="deploy-out-${svc.name.replace(/\./g,'_')}"></div>
         `;
@@ -1630,25 +1856,35 @@ async function loadServices() {
 
     // Add "ADD SUBSYSTEM" card
     const addCard = document.createElement('div');
-    addCard.innerHTML = '<button class="add-subsystem-btn" onclick="addSubsystem()">+ ADD SUBSYSTEM</button>';
+    addCard.innerHTML = `<div class="add-subsystem-form" id="add-form">
+        <div class="add-form-title">+ ADD SUBSYSTEM</div>
+        <div class="config-row"><span class="config-label">NAME</span><input class="config-input" id="add-name" placeholder="myapp.web"></div>
+        <div class="config-row"><span class="config-label">REPO</span><input class="config-input" id="add-repo" placeholder="/home/s3/myapp"></div>
+        <div class="config-row"><span class="config-label">BIN</span><input class="config-input" id="add-bin" value="bin/app.pl"></div>
+        <div class="config-row"><span class="config-label">PORT</span><input class="config-input" id="add-port" placeholder="8080"></div>
+        <div style="padding-top:8px"><button class="btn btn-deploy" onclick="addSubsystem()" style="width:100%;justify-content:center">CREATE</button></div>
+    </div>`;
     grid.appendChild(addCard);
 }
 
 async function addSubsystem() {
-    const name = prompt('Service name (e.g. myapp.web):');
-    if (!name) return;
+    const name = document.getElementById('add-name').value.trim();
+    if (!name) { toast('Enter a service name', 'error'); return; }
     if (!/^[a-z0-9]+\.[a-z0-9]+$/.test(name)) {
         toast('Name must be group.service (e.g. myapp.web)', 'error');
         return;
     }
+    const repo = document.getElementById('add-repo').value.trim() || '/home/s3/' + name.split('.')[0];
+    const bin = document.getElementById('add-bin').value.trim() || 'bin/app.pl';
+    const port = document.getElementById('add-port').value.trim();
     const data = {
         name: name,
-        repo: '/home/s3/' + name.split('.')[0],
+        repo: repo,
         branch: 'master',
-        bin: 'bin/app.pl',
+        bin: bin,
         targets: {
-            live: { port: '', runner: 'hypnotoad', env: {}, logs: {} },
-            dev: { port: '', runner: 'morbo', env: {}, logs: {} },
+            live: { port: port, runner: 'hypnotoad', env: {}, logs: {} },
+            dev: { port: port, runner: 'morbo', env: {}, logs: {} },
         },
     };
     try {
@@ -1667,6 +1903,20 @@ async function addSubsystem() {
     } catch(e) {
         toast('Error: ' + e.message, 'error');
     }
+}
+
+async function svcAction(name, action) {
+    try {
+        const d = await api('/service/' + name + '/' + action, { method: 'POST' });
+        if (d.status === 'success') {
+            toast(name + ' ' + action + ' OK');
+        } else {
+            toast(d.message || action + ' failed', 'error');
+        }
+    } catch(e) {
+        toast(action + ' error: ' + e.message, 'error');
+    }
+    setTimeout(loadServices, 2000);
 }
 
 async function deployService(name, btn, isDev = false) {
@@ -1702,7 +1952,7 @@ async function deployService(name, btn, isDev = false) {
 
     btn.disabled = false;
     btn.classList.remove('deploying');
-    btn.innerHTML = isDev ? 'LAUNCH DEV' : 'LAUNCH';
+    btn.innerHTML = isDev ? 'DEPLOY DEV' : 'DEPLOY';
     setTimeout(loadServices, 2000);
 }
 
@@ -1737,7 +1987,7 @@ setInterval(loadServices, 30000);
                 <dt>REPO</dt><dd id="m-repo">&mdash;</dd>
             </dl>
             <button class="btn btn-deploy" id="deploy-btn" onclick="deploy()" style="width:100%;justify-content:center">
-                LAUNCH
+                DEPLOY
             </button>
             <div class="deploy-output" id="deploy-out"></div>
         </div>
@@ -1765,11 +2015,17 @@ setInterval(loadServices, 30000);
         <div class="config-editor" id="config-editor">
             <div class="config-toolbar">
                 <div class="config-target-tabs" id="config-target-tabs"></div>
-                <button class="btn" onclick="saveConfig()">SAVE</button>
+                <button class="btn" id="save-config-btn" onclick="saveConfig()">SAVE</button>
             </div>
             <div class="config-fields" id="config-fields">
                 <span class="log-empty">Loading config...</span>
             </div>
+        <div class="section-title" style="margin-top:24px">NGINX</div>
+        <div class="config-editor">
+            <div class="config-fields" id="nginx-status">
+                <span class="log-empty">Loading nginx status...</span>
+            </div>
+        </div>
         </div>
     </div>
 </div>
@@ -1802,7 +2058,7 @@ async function loadStatus() {
     if (isDev) {
         deployBtn.className = 'btn btn-deploy-dev';
         deployBtn.setAttribute('onclick', 'deploy(true)');
-        if (!deployBtn.classList.contains('deploying')) deployBtn.innerHTML = 'LAUNCH DEV';
+        if (!deployBtn.classList.contains('deploying')) deployBtn.innerHTML = 'DEPLOY DEV';
     }
 }
 
@@ -1971,7 +2227,7 @@ async function deploy(isDev = false) {
 
     btn.disabled = false;
     btn.classList.remove('deploying');
-    btn.innerHTML = isDev ? 'LAUNCH DEV' : 'LAUNCH';
+    btn.innerHTML = isDev ? 'DEPLOY DEV' : 'DEPLOY';
     loadStatus();
 }
 
@@ -1999,15 +2255,28 @@ async function loadConfig() {
         tabs.appendChild(btn);
     });
 
-    // Add "+" button to add new target
+    // Add "+" button to show inline input for new target
     const addBtn = document.createElement('button');
     addBtn.className = 'config-target-tab';
     addBtn.textContent = '+';
     addBtn.onclick = () => {
-        const name = prompt('Target name (e.g. staging):');
-        if (!name || svcConfig.targets[name]) return;
-        svcConfig.targets[name] = { port: '', runner: 'hypnotoad', env: {}, logs: {} };
-        loadConfig();
+        if (document.getElementById('new-target-input')) return;
+        const input = document.createElement('input');
+        input.id = 'new-target-input';
+        input.className = 'config-input';
+        input.placeholder = 'staging';
+        input.style.cssText = 'width:80px;padding:3px 8px;font-size:13px';
+        input.onkeydown = (e) => {
+            if (e.key === 'Enter') {
+                const name = input.value.trim();
+                if (!name || svcConfig.targets[name]) return;
+                svcConfig.targets[name] = { port: '', runner: 'hypnotoad', env: {}, logs: {} };
+                loadConfig();
+            }
+            if (e.key === 'Escape') input.remove();
+        };
+        tabs.insertBefore(input, addBtn);
+        input.focus();
     };
     tabs.appendChild(addBtn);
 
@@ -2030,6 +2299,8 @@ function renderConfigFields(targetName) {
     html += configRow('HOST', 'cfg-host', t.host || '');
     html += configRow('PORT', 'cfg-port', t.port || '');
     html += configRow('RUNNER', 'cfg-runner', t.runner || 'hypnotoad');
+    html += configRow('DOCS', 'cfg-docs', t.docs || '');
+    html += configRow('ADMIN', 'cfg-admin', t.admin || '');
 
     html += '<div class="config-section-label">ENVIRONMENT</div>';
     const env = t.env || {};
@@ -2039,6 +2310,14 @@ function renderConfigFields(targetName) {
     html += '<div class="config-row"><span class="config-label"></span><button class="btn" onclick="addEnvVar()" style="font-size:11px">+ ADD VAR</button></div>';
 
     fields.innerHTML = html;
+    fields.querySelectorAll('.config-input').forEach(el => {
+        el.addEventListener('input', markConfigDirty);
+    });
+}
+
+function markConfigDirty() {
+    const btn = document.getElementById('save-config-btn');
+    if (btn) btn.className = 'btn btn-save-dirty';
 }
 
 function configRow(label, id, value, isSecret) {
@@ -2047,13 +2326,27 @@ function configRow(label, id, value, isSecret) {
 }
 
 function addEnvVar() {
-    const key = prompt('Variable name (e.g. DB_PASS):');
-    if (!key) return;
-    if (!svcConfig.targets[currentTarget].env) svcConfig.targets[currentTarget].env = {};
-    svcConfig.targets[currentTarget].env[key] = '';
-    renderConfigFields(currentTarget);
-    const input = document.getElementById('cfg-env-' + key);
-    if (input) input.focus();
+    const existing = document.getElementById('new-env-row');
+    if (existing) { existing.querySelector('input').focus(); return; }
+    const fields = document.getElementById('config-fields');
+    const row = document.createElement('div');
+    row.className = 'config-row';
+    row.id = 'new-env-row';
+    row.innerHTML = '<input class="config-input" id="new-env-key" placeholder="VAR_NAME" style="max-width:120px">' +
+        '<input class="config-input secret" id="new-env-val" placeholder="value">';
+    fields.insertBefore(row, fields.lastElementChild);
+    const keyInput = document.getElementById('new-env-key');
+    keyInput.focus();
+    keyInput.onkeydown = (e) => {
+        if (e.key === 'Enter') {
+            const key = keyInput.value.trim().toUpperCase();
+            if (!key) return;
+            if (!svcConfig.targets[currentTarget].env) svcConfig.targets[currentTarget].env = {};
+            svcConfig.targets[currentTarget].env[key] = document.getElementById('new-env-val').value;
+            renderConfigFields(currentTarget);
+        }
+        if (e.key === 'Escape') row.remove();
+    };
 }
 
 async function saveConfig() {
@@ -2068,6 +2361,10 @@ async function saveConfig() {
     t.host = document.getElementById('cfg-host').value;
     t.port = parseInt(document.getElementById('cfg-port').value) || '';
     t.runner = document.getElementById('cfg-runner').value;
+    const docs = document.getElementById('cfg-docs').value.trim();
+    const admin = document.getElementById('cfg-admin').value.trim();
+    if (docs) t.docs = docs; else delete t.docs;
+    if (admin) t.admin = admin; else delete t.admin;
 
     // Read env vars
     const env = {};
@@ -2085,6 +2382,8 @@ async function saveConfig() {
         });
         if (d.status === 'success') {
             toast('Config saved');
+            const sb = document.getElementById('save-config-btn');
+            if (sb) sb.className = 'btn';
             loadGitStatus();
         } else {
             toast(d.message || 'Save failed', 'error');
@@ -2094,10 +2393,76 @@ async function saveConfig() {
     }
 }
 
+async function loadNginxStatus() {
+    const container = document.getElementById('nginx-status');
+    const d = await api('/service/' + SVC + '/nginx');
+    if (d.status !== 'success') {
+        container.innerHTML = '<span class="log-empty">' + (d.message || 'Failed to load') + '</span>';
+        return;
+    }
+    const n = d.data;
+    let html = '';
+    html += '<div class="stat-row"><span class="stat-label">Host</span><span class="stat-value">' + n.host + '</span></div>';
+    html += '<div class="stat-row"><span class="stat-label">Config</span><span class="stat-value ' + (n.config_exists ? 'ok' : 'error') + '">' + (n.config_exists ? 'EXISTS' : 'MISSING') + '</span></div>';
+    html += '<div class="stat-row"><span class="stat-label">Enabled</span><span class="stat-value ' + (n.enabled ? 'ok' : 'error') + '">' + (n.enabled ? 'YES' : 'NO') + '</span></div>';
+    html += '<div class="stat-row"><span class="stat-label">SSL</span><span class="stat-value ' + (n.ssl ? 'ok' : 'warn') + '">' + (n.ssl ? 'ACTIVE' : 'NONE') + '</span></div>';
+    html += '<div style="display:flex;gap:8px;margin-top:12px">';
+    html += '<button class="btn btn-deploy" onclick="nginxSetup()" style="flex:1;justify-content:center">SETUP NGINX</button>';
+    if (!n.ssl) {
+        html += '<button class="btn btn-tint btn-docs" onclick="nginxCertbot()" style="flex:1;justify-content:center">GET SSL CERT</button>';
+    }
+    html += '</div>';
+    html += '<div class="deploy-output" id="nginx-out"></div>';
+    container.innerHTML = html;
+}
+
+async function nginxSetup() {
+    const out = document.getElementById('nginx-out');
+    out.classList.add('visible');
+    out.innerHTML = '<span class="step-label">Setting up nginx...</span>\n';
+    try {
+        const d = await api('/service/' + SVC + '/nginx/setup', { method: 'POST' });
+        out.innerHTML = '';
+        if (d.data && d.data.steps) {
+            d.data.steps.forEach(step => {
+                const ok = (typeof step.success === 'boolean') ? step.success : step.success;
+                const cls = ok ? 'step-ok' : 'step-fail';
+                const icon = ok ? '\u2713' : '\u2717';
+                out.innerHTML += '<span class="' + cls + '">' + icon + '</span> <span class="step-label">' + step.step + '</span>  ' + (step.output||'').substring(0, 200) + '\n';
+            });
+        }
+        toast(d.status === 'success' ? 'Nginx configured' : (d.message || 'Setup failed'), d.status === 'success' ? 'success' : 'error');
+        loadNginxStatus();
+    } catch(e) {
+        out.innerHTML += '<span class="step-fail">\u2717 ' + e.message + '</span>\n';
+        toast('Nginx setup error', 'error');
+    }
+}
+
+async function nginxCertbot() {
+    const out = document.getElementById('nginx-out');
+    out.classList.add('visible');
+    out.innerHTML = '<span class="step-label">Requesting SSL certificate...</span>\n';
+    try {
+        const d = await api('/service/' + SVC + '/nginx/certbot', { method: 'POST' });
+        if (d.status === 'success') {
+            toast('SSL certificate obtained');
+            out.innerHTML += '<span class="step-ok">\u2713 Certificate installed</span>\n';
+        } else {
+            toast(d.message || 'Certbot failed', 'error');
+            out.innerHTML += '<span class="step-fail">\u2717 ' + (d.data?.output || d.message) + '</span>\n';
+        }
+        loadNginxStatus();
+    } catch(e) {
+        toast('Certbot error', 'error');
+    }
+}
+
 loadStatus();
 initLogTabs();
 loadAnalysis();
 loadConfig();
+loadNginxStatus();
 setInterval(loadStatus, 10000);
 </script>
 % end
