@@ -13,7 +13,7 @@ targets:
         env:
             MOJO_MODE: ENC[AES256_GCM,data:FTPy8vGs0Jxy0Q==,iv:Dhvss3ntvekam+7DYNwvJTR3f/tJCGzhZfl03gTw65U=,tag:DJrbgg72eS3gw5F7evEyAQ==,type:str]
     dev:
-        host: dev.123.do
+        host: 123.do.dev
         port: 8123
         runner: morbo
         logs:

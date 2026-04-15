@@ -14,7 +14,7 @@ targets:
         env:
             MOJO_MODE: ENC[AES256_GCM,data:HGnjzrUL4eNMSw==,iv:kOfmXBxB/niHBHqbEgwWpvAAmOA9GSB+swGkNkshFbQ=,tag:ost7pSYLpTqHEhiYxcpTMg==,type:str]
     dev:
-        host: dev.nigelhamilton.com
+        host: nigelhamilton.com.dev
         port: 7007
         runner: morbo
         logs:

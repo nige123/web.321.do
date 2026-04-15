@@ -11,6 +11,7 @@ targets:
         runner: morbo
     live:
         env: {}
+        host: zorda.co
         logs: {}
         port: "6000"
         runner: hypnotoad

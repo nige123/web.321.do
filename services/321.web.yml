@@ -7,7 +7,7 @@ targets:
     dev:
         env:
             MOJO_MODE: ENC[AES256_GCM,data:LWeybupzv4PeF3U=,iv:LuiUBpyO+SH2JKYepbYVly3yNdOuz8a2vHF2sVZ5zWs=,tag:YwdwFbKJl1DBBu8B8bU0Iw==,type:str]
-        host: dev.321.do
+        host: 321.do.dev
         logs:
             stderr: /tmp/321.do.stderr.log
             stdout: /tmp/321.do.stdout.log
