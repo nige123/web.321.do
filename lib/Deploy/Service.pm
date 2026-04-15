@@ -139,6 +139,30 @@ sub deploy_dev ($self, $name) {
     return $self->deploy($name, skip_git => 1);
 }
 
+sub restart ($self, $name) {
+    my $svc = $self->config->service($name);
+    return { status => 'error', message => "Unknown service: $name" } unless $svc;
+
+    my @steps;
+
+    my $s = $self->_step_ubic_restart($name);
+    push @steps, $s;
+    return $self->_deploy_result($name, 'error', 'Ubic restart failed', \@steps)
+        unless $s->{success};
+
+    sleep 2;
+    $s = $self->_step_port_check($svc);
+    push @steps, $s;
+
+    my $port_ok = ref $s->{success} ? ${$s->{success}} : $s->{success};
+    return $self->_deploy_result(
+        $name,
+        $port_ok ? 'success' : 'error',
+        $port_ok ? "Restarted $name" : 'Port check failed after restart',
+        \@steps,
+    );
+}
+
 sub migrate ($self, $name) {
     my $svc = $self->config->service($name);
     return { status => 'error', message => "Unknown service: $name" } unless $svc;

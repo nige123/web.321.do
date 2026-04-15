@@ -200,4 +200,16 @@ subtest 'migrate: missing bin/migrate reports no-op' => sub {
     is scalar @{ $r->{data}{steps} }, 0,                 'no steps emitted';
 };
 
+subtest 'restart: runs ubic_restart then port_check' => sub {
+    my ($home, $repo) = make_fixture();
+    my $svc_mgr = TestService->new(
+        config => Deploy::Config->new(app_home => $home, target => 'live'),
+        log    => Mojo::Log->new(level => 'fatal'),
+    );
+    my $r = $svc_mgr->restart('demo.web');
+    my @steps = map { $_->{step} } @{ $r->{data}{steps} };
+    is_deeply \@steps, [qw(ubic_restart port_check)],
+        'restart emits only ubic_restart + port_check';
+};
+
 done_testing;
