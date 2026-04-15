@@ -1,6 +1,7 @@
 package Deploy::Command::install;
 
 use Mojo::Base 'Deploy::Command', -signatures;
+use Deploy::Hosts;
 
 has description => 'First-time install: clone, deps, ubic, nginx, certbot';
 has usage => sub ($self) { $self->extract_usage };
@@ -79,6 +80,19 @@ sub run ($self, @args) {
         }
     } else {
         say "  [SKIP] No host/port, skipping nginx";
+    }
+
+    # Refresh /etc/hosts managed block (dev hostnames)
+    my $dev_hosts = $self->config->dev_hostnames;
+    if (@$dev_hosts && -w '/etc/hosts') {
+        my $ok = eval { Deploy::Hosts->new->write($dev_hosts); 1 };
+        if ($ok) {
+            say "  [OK] /etc/hosts refreshed (" . scalar(@$dev_hosts) . " dev hosts)";
+        } else {
+            warn "  [WARN] /etc/hosts update failed: $@";
+        }
+    } elsif (@$dev_hosts) {
+        say "  [SKIP] /etc/hosts not writable - run: sudo -E perl bin/321.pl hosts";
     }
 
     say "";
