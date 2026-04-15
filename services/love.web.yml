@@ -1,5 +1,5 @@
 bin: bin/app.pl
-branch: master
+branch: main
 name: love.web
 repo: /home/s3/love.honeywillow.com
 targets:
@@ -22,14 +22,14 @@ sops:
         - recipient: age1aym3w56q3wx0u8p6dpxkc2skxz838ut78cjznyjncnz3zz8a35kqzrp3q7
           enc: |
             -----BEGIN AGE ENCRYPTED FILE-----
-            YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBwWEF5aDBTRUNlM3N2bUpm
-            c3lYT1orb2srNERQK1BiVERwZUl5eHh6YldvCnFIMGRmbWVBWDVpdjJlWWZvTTlT
-            MXkvREYxYldBQ1VQczkxMVdsSEd1SXMKLS0tIGRiTVhDTnVRa25JcXZSbzdxajND
-            MG8rclBPYmFNbmhaWUVGUnR2eWU2d1EK3qCRY41vxfrGjLihBrIqi8kn3k1VY0bk
-            L28uGp8Ve9/DFnfTj4t4dD7ruYq3auYnyY6UsQjNwQBNFLaZZpJAlQ==
+            YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB0cmFwODg4Sm1iMEowcHNW
+            aDJ2TU9SSFZqNWFpMEpldG5DMGFmNWdVZWtNCkJ1WDRUaU9uYXVuRXMxVVRydzR1
+            NElnSDlXaFprT2NJTVJ1MkR5eittR1EKLS0tIFpraTlIMUk2UFltR3p1MXZtVUh5
+            azd0SDR2MXpmb2dBOXRBcVRlUmVpOFEK6vy9IxELjMmUfTKJ5dyF6N8sbBpY884d
+            26NBFJFh516doQKUIhxNQcO/7ZzKvofF7Dq5VbMiKY0ABpqaa92Rwg==
             -----END AGE ENCRYPTED FILE-----
-    lastmodified: "2026-04-15T18:50:32Z"
-    mac: ENC[AES256_GCM,data:QrqPQYd5NcErisWIekS5qf0uCsQCFjgEYZ+ypEV58BdtHHfFeG4AfP7ySRzYJagW5JrOp6gX+4/sGLdd/g7ny5mM6oNXdmPNkdHfV+ugbOJReGD1sGipGD8gczfCxnyPRrmz4Z8q43gZAOC1mzo0Pd3t3mqHBIMdcnl+poxNef4=,iv:CRuLQxLpedO/cmCssGHRRWIJP7y7i8Nznw4SteDQMOw=,tag:InHOelbVmjP1CyttOmbBgA==,type:str]
+    lastmodified: "2026-04-15T19:54:37Z"
+    mac: ENC[AES256_GCM,data:hobb2NzayKutvRGm7uWMeefDz6nHaIM+pH7iM8usEfNB3Ycw8I4URRAIT8GiCwXNVEcu12imSai1wbV3Eq34Bkg7KyfyuVmyOykwdVwFNkIE69YTNMF+9kT84JfSHxXzjAizhhdTsfE9olN2BQo6APgiz7h0w1RrCxk4y2CJbTc=,iv:btyLQoiw2Wj2RoJQkA31trfozXSB5NE4oPfkGTvzR8U=,tag:EMkrSumdp7vfDfGXvOYsXA==,type:str]
     pgp: []
     encrypted_regex: ^(env)$
     version: 3.9.4
