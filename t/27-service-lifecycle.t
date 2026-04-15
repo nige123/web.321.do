@@ -172,4 +172,32 @@ subtest 'update: aborts on git_pull failure' => sub {
     is $r->{status}, 'error';
 };
 
+subtest 'migrate: runs only the migrate step' => sub {
+    my ($home, $repo) = make_fixture();
+    path($repo, 'bin')->mkpath;
+    path($repo, 'bin/migrate')->spew_utf8('#!/bin/sh' . "\n" . 'echo migrated' . "\n");
+    chmod 0755, "$repo/bin/migrate";
+
+    my $svc_mgr = Deploy::Service->new(
+        config => Deploy::Config->new(app_home => $home, target => 'live'),
+        log    => Mojo::Log->new(level => 'fatal'),
+    );
+    my $r = $svc_mgr->migrate('demo.web');
+    my @steps = map { $_->{step} } @{ $r->{data}{steps} };
+    is_deeply \@steps, ['migrate'], 'single step';
+    is $r->{status}, 'success';
+};
+
+subtest 'migrate: missing bin/migrate reports no-op' => sub {
+    my ($home, $repo) = make_fixture();
+    my $svc_mgr = Deploy::Service->new(
+        config => Deploy::Config->new(app_home => $home, target => 'live'),
+        log    => Mojo::Log->new(level => 'fatal'),
+    );
+    my $r = $svc_mgr->migrate('demo.web');
+    is $r->{status}, 'success',                          'no-op is success';
+    like $r->{message}, qr/no bin\/migrate/i,            'message explains';
+    is scalar @{ $r->{data}{steps} }, 0,                 'no steps emitted';
+};
+
 done_testing;

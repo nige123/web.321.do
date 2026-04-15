@@ -139,6 +139,24 @@ sub deploy_dev ($self, $name) {
     return $self->deploy($name, skip_git => 1);
 }
 
+sub migrate ($self, $name) {
+    my $svc = $self->config->service($name);
+    return { status => 'error', message => "Unknown service: $name" } unless $svc;
+
+    unless (-x "$svc->{repo}/bin/migrate") {
+        return $self->_deploy_result($name, 'success', "no bin/migrate in $svc->{repo}", []);
+    }
+
+    my $s = $self->_step_migrate($svc);
+    my $ok = $s->{success};
+    return $self->_deploy_result(
+        $name,
+        $ok ? 'success' : 'error',
+        $ok ? "Migrated $name" : 'Migration failed',
+        [$s],
+    );
+}
+
 sub update ($self, $name) {
     my $svc = $self->config->service($name);
     return { status => 'error', message => "Unknown service: $name" } unless $svc;
