@@ -106,11 +106,12 @@ sub _deploy_result ($self, $name, $status, $message, $steps) {
     };
 }
 
-sub _run_in_dir ($self, $dir, $cmd) {
+sub _run_in_dir ($self, $dir, $cmd, %opts) {
+    my $timeout = $opts{timeout} // 600;
     $self->log->info("Running: cd $dir && $cmd");
     my $output = eval {
         local $SIG{ALRM} = sub { die "Command timed out\n" };
-        alarm 120;
+        alarm $timeout;
         my $result = `cd \Q$dir\E && $cmd 2>&1`;
         alarm 0;
         $result;
