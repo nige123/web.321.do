@@ -101,6 +101,20 @@ Use dev for local iteration (morbo autoreload, mkcert SSL, `dev.*.do` hostnames)
 
 ---
 
+## Per-repo Perl deps (`local/`)
+
+Each service repo keeps its own CPAN dependencies under `./local/`. Deploys run `cpanm -L local/ --notest --installdeps .`; the generated ubic wrapper prepends `PERL5LIB=<repo>/local/lib/perl5` and `PATH=<repo>/local/bin:$PATH` so the running daemon finds them. No sharing with system `site_perl`; no cross-service pollution.
+
+**Every service repo must gitignore `/local/`**. A one-liner to add it:
+
+```
+echo '/local/' >> .gitignore && git add .gitignore && git commit -m 'Ignore cpanm --local dir'
+```
+
+If a later need arises for reproducible builds across boxes, layer [Carton](https://metacpan.org/pod/Carton) on top — it commits a `cpanfile.snapshot` and uses the same `./local/` tree.
+
+---
+
 ## Secrets
 
 Plaintext secrets live in `secrets/<name>.env` — shell-style `KEY=value`, one per line. They are gitignored. 321 loads them into the ubic wrapper env when a service starts.

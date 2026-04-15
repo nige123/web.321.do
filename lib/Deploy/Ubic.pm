@@ -72,6 +72,11 @@ sub _render_service_file ($self, $name, $svc) {
     my $mode    = $svc->{mode} // 'production';
     my $runner  = $svc->{runner} // 'hypnotoad';
 
+    # bin_cmd contains shell-quoted env values with embedded single quotes.
+    # Escape backslashes and single quotes so the string survives being
+    # interpolated into a Perl single-quoted literal in the rendered file.
+    my $bin_literal = $bin_cmd =~ s/([\\'])/\\$1/gr;
+
     return <<"END_UBIC";
 use Ubic::Service::SimpleDaemon;
 
@@ -80,7 +85,7 @@ my \$LOG_ROOT = '/tmp';
 # $name ($mode via $runner) — generated from services.yml
 Ubic::Service::SimpleDaemon->new(
     cwd         =>  '$cwd',
-    bin         =>  '$bin_cmd',
+    bin         =>  '$bin_literal',
     stdout      =>  '$stdout',
     stderr      =>  '$stderr',
     ubic_log    =>  '$ubic_log',
@@ -102,6 +107,11 @@ sub _build_bin_cmd ($self, $svc) {
     # Drop empty values — emitting VAR='' breaks the outer single-quoted bin
     # string and is equivalent to 'unset' for the app anyway.
     delete $all_env{$_} for grep { !defined $all_env{$_} || !length $all_env{$_} } keys %all_env;
+
+    # Point the runtime at the repo's own local::lib tree (populated by
+    # `cpanm -L local/ --installdeps .` during deploy).
+    $all_env{PERL5LIB} = "$repo/local/lib/perl5";
+    $all_env{PATH}     = "$repo/local/bin:" . ($ENV{PATH} // '/usr/local/bin:/usr/bin:/bin');
 
     my $env_str = '';
     if (%all_env) {

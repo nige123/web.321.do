@@ -89,7 +89,10 @@ sub deploy_dev ($self, $name) {
 }
 
 sub _cpanm_cmd ($self, $perlbrew) {
-    my $cmd = 'cpanm --notest --installdeps .';
+    # Install into ./local/ so each repo owns its dep tree. Runtime env
+    # (PERL5LIB/PATH) is wired up by Deploy::Ubic when generating the
+    # service wrapper.
+    my $cmd = 'cpanm -L local --notest --installdeps .';
     return $cmd unless $perlbrew;
     return "bash -lc 'source ~/perl5/perlbrew/etc/bashrc && perlbrew use $perlbrew && $cmd'";
 }
