@@ -136,13 +136,12 @@ say "--- Setting up ubic service ---";
 system("$perlbrew cpanm Ubic Ubic::Service::SimpleDaemon") == 0
     or die "Failed to install Ubic modules\n";
 
-# Ubic needs a one-time setup to create /var/lib/ubic, /var/log/ubic, etc.
-# The existence of /etc/ubic/ubic.cfg is ubic's own "already configured" marker.
-unless (-f '/etc/ubic/ubic.cfg') {
-    say "  Running ubic-admin setup (first-time ubic bootstrap)...";
-    system(  "ubic-admin setup --batch-mode"
-           . " --service-dir $app_dir/ubic/service"
-           . " --default-user $run_user") == 0
+# Bootstrap ubic per-user (--local) rather than system-wide. Config lands in
+# $HOME/.ubic.cfg, data/logs under $HOME/ubic/, services run as $run_user.
+# The existence of ~/.ubic.cfg is ubic's own "already configured" marker.
+unless (-f "$user_home/.ubic.cfg") {
+    say "  Running ubic-admin setup (first-time ubic bootstrap, --local)...";
+    system("su - $run_user -c '$perlbrew ubic-admin setup --batch-mode --local --service-dir $app_dir/ubic/service'") == 0
         or die "ubic-admin setup failed\n";
 }
 
