@@ -1,0 +1,47 @@
+bin: bin/321.pl
+branch: master
+name: 321.web
+perlbrew: perl-5.42.1
+repo: /home/s3/321.do
+targets:
+    dev:
+        env:
+            MOJO_MODE: ENC[AES256_GCM,data:LWeybupzv4PeF3U=,iv:LuiUBpyO+SH2JKYepbYVly3yNdOuz8a2vHF2sVZ5zWs=,tag:YwdwFbKJl1DBBu8B8bU0Iw==,type:str]
+        host: dev.321.do
+        logs:
+            stderr: /tmp/321.do.stderr.log
+            stdout: /tmp/321.do.stdout.log
+            ubic: /tmp/321.do.ubic.log
+        port: 9321
+        runner: morbo
+    live:
+        env:
+            DB_PASS: ENC[AES256_GCM,data:8HNpBM9RFZwKY3gK+yI=,iv:m+VjYpF+qm3eWpRWlDHkjC0SbTcheq5odJKq/trwzg0=,tag:tuu4R7IZzNTHiJqNG4fZeA==,type:str]
+            MOJO_MODE: ENC[AES256_GCM,data:SbtvqiWJObMUIQ==,iv:NLhLPDYyVa/jbBx59GURdJdrbGsvbpVqXTSl75ESBTM=,tag:Y3EBk5AlYnWviF/r+RfPFw==,type:str]
+        host: 321.do
+        logs:
+            stderr: /tmp/321.do.stderr.log
+            stdout: /tmp/321.do.stdout.log
+            ubic: /tmp/321.do.ubic.log
+        port: 9321
+        runner: hypnotoad
+sops:
+    kms: []
+    gcp_kms: []
+    azure_kv: []
+    hc_vault: []
+    age:
+        - recipient: age19ewwpe6626u470qdp5jhuheuekg7s6ak8gcntjmt20q64560ucfsny8efc
+          enc: |
+            -----BEGIN AGE ENCRYPTED FILE-----
+            YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBwbkgvS1o0UzhEOWxRY3ZS
+            dlYrTXk0ZVppeHZ2aGkyT0xGMWxjSFZjNWpVCmtBQkplcFBZandQODFSeDRpeklp
+            SVBKdUxacGN1YWNSWjh2cjhnM1c5YzQKLS0tIHFjVUNKSDY0RkY5SDcyb1NsSWdW
+            RnBrMEl3ZVlRZ3lDakwxUDlVYzBQZHMKA3gTxaaA3ZJFca1y2yuE7H5X9GgN9ZJk
+            JTixumwHY2Y3Nr7EMTLuAlk6Xk1230RXfqKR0stQg7Hn67ySlBtAxA==
+            -----END AGE ENCRYPTED FILE-----
+    lastmodified: "2026-04-10T06:45:22Z"
+    mac: ENC[AES256_GCM,data:T6X3GmcWTz9vZYwY144mxQP1PGaykKninO/ryYi4Kk6PqYe/gy6l41JrvmG0hS7FcLPl5UkIzN37jSUodUtQT8rp2whTYtyZNLAU0/k9VI7XVAyYXMXQR0NnFAZvarbjzu50TObFDYLPwK5YFKVizv98Oei3kOa1lZA6Tv0ndOQ=,iv:2f/Rr0w0flVaXKX5kxtgPZFlxDMG238fOELF657DGHE=,tag:3e9I61yNKLwpltG/tRB1qQ==,type:str]
+    pgp: []
+    encrypted_regex: ^(env)$
+    version: 3.9.4

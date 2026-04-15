@@ -1,0 +1,128 @@
+package Deploy::Command::install;
+
+use Mojo::Base 'Deploy::Command', -signatures;
+use Deploy::Hosts;
+
+has description => 'First-time install: clone, deps, ubic, nginx, certbot';
+has usage => sub ($self) { $self->extract_usage };
+
+sub run ($self, @args) {
+    die $self->usage unless @args;
+    my $name = $self->resolve_service($args[0]);
+
+    my $svc      = $self->config->service($name);
+    my $repo     = $svc->{repo};
+    my $branch   = $svc->{branch} // 'master';
+    my $perlbrew = $svc->{perlbrew};
+    my $host     = $svc->{host} // 'localhost';
+    my $port     = $svc->{port};
+
+    say "3... 2... 1... installing $name";
+    say "";
+
+    # Step 1: Clone repo
+    if (-d $repo) {
+        say "  [OK] Repo already exists: $repo";
+    } else {
+        say "  Cloning repo to $repo...";
+        my $git_url = $self->_guess_git_url($repo);
+        if ($git_url) {
+            $self->run_cmd("git clone -b $branch $git_url $repo");
+            say "  [OK] Cloned $git_url";
+        } else {
+            die "  Repo $repo does not exist and no git URL found.\n";
+        }
+    }
+
+    # Step 2: Install deps
+    say "  Installing dependencies...";
+    my $ok = $self->run_cpanm($repo, $perlbrew);
+    say $ok ? "  [OK] Dependencies installed" : "  [WARN] cpanm had errors (continuing)";
+
+    # Step 3: Ubic service
+    say "  Setting up ubic service...";
+    my $gen = $self->ubic->generate($name);
+    say "  [OK] Generated: $gen->{path}";
+    $self->ubic->install_symlinks;
+    say "  [OK] Symlinks installed";
+
+    # Step 4: Start service
+    say "  Starting service...";
+    system("ubic start $name 2>&1");
+    say "  [OK] Service started";
+
+    # Step 5: Nginx + SSL
+    if ($host ne 'localhost' && $port) {
+        say "  Setting up nginx for $host -> :$port...";
+        my $result = $self->nginx->setup($name);
+        for my $step (@{ $result->{steps} // [] }) {
+            my $s = ref $step->{success} ? ${$step->{success}} : $step->{success};
+            printf "  [%s] %s\n", ($s ? 'OK' : 'WARN'), $step->{step};
+        }
+
+        my $target = $self->config->target;
+        my $provider = $self->nginx->cert_provider->pick($target);
+        say "  Requesting SSL certificate for $host via $provider...";
+        my $cert = $self->nginx->acquire_cert($name);
+        if ($cert->{status} eq 'ok') {
+            say "  [OK] SSL cert ready ($provider)";
+            $self->nginx->generate($name);
+            $self->nginx->reload;
+        } else {
+            my $hint = $provider eq 'mkcert'
+                ? "    # macOS:  brew install mkcert\n"
+                . "    # Linux:  sudo apt install libnss3-tools mkcert\n"
+                . "    mkcert -install\n"
+                : "    sudo certbot certonly --standalone -d $host\n";
+            warn "  [WARN] $provider failed:\n";
+            warn "    $_\n" for split /\n/, ($cert->{output} // '');
+            warn $hint;
+        }
+    } else {
+        say "  [SKIP] No host/port, skipping nginx";
+    }
+
+    # Refresh /etc/hosts managed block (dev hostnames)
+    my $dev_hosts = $self->config->dev_hostnames;
+    if (@$dev_hosts && -w '/etc/hosts') {
+        my $ok = eval { Deploy::Hosts->new->write($dev_hosts); 1 };
+        if ($ok) {
+            say "  [OK] /etc/hosts refreshed (" . scalar(@$dev_hosts) . " dev hosts)";
+        } else {
+            warn "  [WARN] /etc/hosts update failed: $@";
+        }
+    } elsif (@$dev_hosts) {
+        say "  [SKIP] /etc/hosts not writable - run: sudo -E perl bin/321.pl hosts";
+    }
+
+    say "";
+    say "  $name installed.";
+}
+
+sub _guess_git_url ($self, $repo) {
+    my $parent = Mojo::File->new($repo)->dirname;
+    for my $sibling ($parent->list->each) {
+        next unless -d "$sibling/.git";
+        my $url = `cd $sibling && git remote get-url origin 2>/dev/null`;
+        chomp $url;
+        next unless $url;
+        my $sibling_name = $sibling->basename;
+        my $target_name  = Mojo::File->new($repo)->basename;
+        (my $guessed = $url) =~ s/\Q$sibling_name\E/$target_name/;
+        return $guessed if $guessed ne $url;
+    }
+    return undef;
+}
+
+1;
+
+=head1 SYNOPSIS
+
+  Usage: APPLICATION install <service>
+
+  Options:
+    -h, --help   Show this message
+
+  321 install zorda.web   # clone, deps, ubic, nginx, certbot
+
+=cut

@@ -1,4 +1,7 @@
 secrets/*.env
+secrets/*.audit.log
 deploy_token.txt
 /tmp/
 *precomp*
+bin/hypnotoad.pid
+/deploy.do/

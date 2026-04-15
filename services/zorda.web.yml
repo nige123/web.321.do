@@ -1,0 +1,36 @@
+bin: bin/app.pl
+branch: master
+name: zorda.web
+repo: /home/s3/web.zorda.co
+targets:
+    dev:
+        env: {}
+        host: zorda.co.dev
+        logs: {}
+        port: 6000
+        runner: morbo
+    live:
+        env: {}
+        logs: {}
+        port: "6000"
+        runner: hypnotoad
+sops:
+    kms: []
+    gcp_kms: []
+    azure_kv: []
+    hc_vault: []
+    age:
+        - recipient: age19ewwpe6626u470qdp5jhuheuekg7s6ak8gcntjmt20q64560ucfsny8efc
+          enc: |
+            -----BEGIN AGE ENCRYPTED FILE-----
+            YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBzRGdXRVRpNlBsV25TTTZS
+            cnhWRXBCd2hONXRIZ29MVm5MZHUyUlBoRWo0Cm9jSWlwc2ttSUtVcml1Z1VYcFNO
+            enE3R3Q1NUw2cE1lcnBraXppMkRvbkkKLS0tIGY3M0JWOGplaWViSWhKcGI2RGJH
+            YlVwdUtSMS9ZdlI5M0dKck1odnlPdWsKvE2VbfQnIetm46Jb7INZV2Ukb6j2s1Ny
+            vwo0Q7q7FcHdoYJRn3wU/Iau2L1piAlo0QMc1xsAp8SbH75o+1f6/w==
+            -----END AGE ENCRYPTED FILE-----
+    lastmodified: "2026-04-10T10:46:01Z"
+    mac: ENC[AES256_GCM,data:gjBrMHcPicAv2Bc0LggC876les7mhplZ0kQo2f6d2JHMgRVJjse3BMRb+08OQZFf7O3pFWEBv+ZSlJ9q5JbFeu49CnjpT4Br71HS9asS8Zgp9OhtpvQtX7MdBTTj1cOi/9i0AtM1u1bjtfPKYccVxv+YoTGuVZ8LXyiXVBU0pHQ=,iv:+acQunkQjYkNS7wiof8peMNYCx63F70n2ArT7mn7eEk=,tag:xa8HGnDXlPCmxzAGgs3/PA==,type:str]
+    pgp: []
+    encrypted_regex: ^(env)$
+    version: 3.9.4

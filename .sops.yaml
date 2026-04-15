@@ -1,0 +1,4 @@
+creation_rules:
+    - path_regex: services/.*\.yml$
+      encrypted_regex: ^(env)$
+      age: age19ewwpe6626u470qdp5jhuheuekg7s6ak8gcntjmt20q64560ucfsny8efc

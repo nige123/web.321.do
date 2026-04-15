@@ -1,0 +1,46 @@
+name: 123.api
+repo: /home/s3/api.123.do
+branch: master
+bin: bin/app.pl
+targets:
+    live:
+        host: 123.do
+        port: 9123
+        runner: hypnotoad
+        logs:
+            stdout: /tmp/123.api.stdout.log
+            stderr: /tmp/123.api.stderr.log
+            ubic: /tmp/123.api.ubic.log
+            app: /tmp/123.api.stdout.log
+        env:
+            MOJO_MODE: ENC[AES256_GCM,data:PLEaJL1vnyDEew==,iv:Nwx5X7i0g+FdU+1NQ7A8HUIVHhHzsXSP40bmE3IhQUo=,tag:vSDy2fVGb9oP6zK14xiP4A==,type:str]
+    dev:
+        host: dev.123.do
+        port: 9123
+        runner: morbo
+        logs:
+            stdout: /tmp/123.api.stdout.log
+            stderr: /tmp/123.api.stderr.log
+            ubic: /tmp/123.api.ubic.log
+        env:
+            MOJO_MODE: ENC[AES256_GCM,data:7Nuyb0F3vFVjdcY=,iv:0oudEIfw/RIlIHOs7C3S0aidFhvIcH5K6f3FjpYrgPU=,tag:YDCjj07xN99NyXl1X3Ct8g==,type:str]
+sops:
+    kms: []
+    gcp_kms: []
+    azure_kv: []
+    hc_vault: []
+    age:
+        - recipient: age19ewwpe6626u470qdp5jhuheuekg7s6ak8gcntjmt20q64560ucfsny8efc
+          enc: |
+            -----BEGIN AGE ENCRYPTED FILE-----
+            YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB1UndMM09ybGI4MmM0ZVlC
+            R24wM2FHU0tPNlVrWHJsMk0wRFJralIxOWlRCitOZXpoS2pKVnJMVFBqTVdZT3hH
+            QWVBVUlmUTNKaFpNUVMzdnQ0UWloSXMKLS0tIGNJMWxkMU5YOCt0Y0V2S29WdTNn
+            VzRBa0JaTkVGQnJBdHNTcytuTFVUVXMK3BE6j4eWGtLkmvmV4tWH1YdUxb80rEUM
+            w4iEI2jZVEmo3fC/L1V/czuio4tKjWcbXaY0uWTCWLxPuzGaNaUDPw==
+            -----END AGE ENCRYPTED FILE-----
+    lastmodified: "2026-04-10T04:15:45Z"
+    mac: ENC[AES256_GCM,data:dWJ1xMEWa2Q66saCg07/tj63im24BVj7PCA/1RnnVbyBpA7vxB4RPokbKlwDPNiqtC+pKcYEAHxv0qHMavnKeg/diHT0+kKJANeUG0NQPTNQPRhowFvG1PhG6Hr/tu8bxkkzFTUFn608SBB/SKB9r/vbZB10d60/CstX9c1bynA=,iv:JCie2PV7AY8ojTFfQdQz37VeMhcpHynhHbEjuLq9riI=,tag:huwxJhktMeGeJN201t8seQ==,type:str]
+    pgp: []
+    encrypted_regex: ^(env)$
+    version: 3.9.4

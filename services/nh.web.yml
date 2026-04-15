@@ -1,0 +1,44 @@
+name: nh.web
+repo: /home/s3/nigelhamilton.com/mojo
+branch: master
+bin: script/nh
+perlbrew: perl-5.42.1
+targets:
+    live:
+        host: nigelhamilton.com
+        port: 7007
+        runner: hypnotoad
+        logs:
+            stdout: /tmp/nh.web.stdout.log
+            stderr: /tmp/nh.web.stderr.log
+        env:
+            MOJO_MODE: ENC[AES256_GCM,data:HGnjzrUL4eNMSw==,iv:kOfmXBxB/niHBHqbEgwWpvAAmOA9GSB+swGkNkshFbQ=,tag:ost7pSYLpTqHEhiYxcpTMg==,type:str]
+    dev:
+        host: dev.nigelhamilton.com
+        port: 7007
+        runner: morbo
+        logs:
+            stdout: /tmp/nh.web.stdout.log
+            stderr: /tmp/nh.web.stderr.log
+        env:
+            MOJO_MODE: ENC[AES256_GCM,data:r143DG1N9gcFnx0=,iv:Lwjn+PiQZnsskxCdOEqIiRx497iH+95uZZNZ8Hb3ric=,tag:FzSBTkl5wIGBBoNTM9z8kA==,type:str]
+sops:
+    kms: []
+    gcp_kms: []
+    azure_kv: []
+    hc_vault: []
+    age:
+        - recipient: age19ewwpe6626u470qdp5jhuheuekg7s6ak8gcntjmt20q64560ucfsny8efc
+          enc: |
+            -----BEGIN AGE ENCRYPTED FILE-----
+            YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBDL0xScVJ2T1JLUlA0WjJp
+            c1hzTFNHWXFFZVlHc1NXdS95WDdLZzl4bkVnCnpwRXEvZkMwdDFTOXRoVkNqSGNj
+            aG1nMVVzL0lLOURqZEp6R2c2TjFWa2MKLS0tIG1yUjJ6c1oyRzR1cWZ0dVVUTEdF
+            ZXJRNzJIL3lETHBjdk9JN2xPanZrNGMKNoG5cuxyBdmoNm8DrXHt1SH0LNG3mq1o
+            w9LzPtZNRbtEsBmhhZfQX1SaF2t297MojftU8yr4uT41Yfso/W1Ahw==
+            -----END AGE ENCRYPTED FILE-----
+    lastmodified: "2026-04-10T04:15:45Z"
+    mac: ENC[AES256_GCM,data:Bukp9aSw5SqLPrIz5/pSyFjLvP93jMQ09LaL5QjIkqimaa80qNgXtvJjQOrSZeME+QPaxIqRkDntSti4DlMWlzkx8JcXMBM53oj9Se6pbAgIHuI0KJow9rZOX6/KltC9smQ/TmL7LoAAWqmq0m2V8IwGCs36kmHut82T5OJA5c4=,iv:Rdw0D9gyo/RjTAZ987QhjF73NFjUaiKPPhZgNcTF7jw=,tag:aJWza+E+391O+DJd+hKt4A==,type:str]
+    pgp: []
+    encrypted_regex: ^(env)$
+    version: 3.9.4

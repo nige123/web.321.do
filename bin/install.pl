@@ -9,7 +9,7 @@ use File::Copy;
 use File::Path qw(make_path);
 
 my $domain     = '321.do';
-my $app_port   = 9999;
+my $app_port   = 9321;
 my $app_dir    = '/home/s3/321.do';
 my $perl_ver   = 'perl-5.42.1';
 my $run_user   = (getpwuid((stat $app_dir)[4]))[0] // $ENV{SUDO_USER} // 'ubuntu';
@@ -129,20 +129,16 @@ say "--- Reloading nginx ---";
 system('systemctl reload nginx') == 0
     or die "nginx reload failed\n";
 
-# --- Step 8: Ubic service symlink ---
+# --- Step 8: Generate ubic service files + symlinks ---
 say "--- Setting up ubic service ---";
-make_path($ubic_dest) unless -d $ubic_dest;
-my $ubic_link = "$ubic_dest/web";
-if (-l $ubic_link) {
-    unlink $ubic_link;
-}
-symlink "$ubic_src/web", $ubic_link
-    or die "Cannot symlink $ubic_link -> $ubic_src/web: $!\n";
-say "Symlinked $ubic_link";
 
 # Ensure Ubic is installed
-system("$perlbrew cpanm Ubic Ubic::Service::SimpleDaemon'") == 0
+system("$perlbrew cpanm Ubic Ubic::Service::SimpleDaemon") == 0
     or die "Failed to install Ubic modules\n";
+
+# Generate ubic files from services.yml and install symlinks
+system("su - $run_user -c 'cd $app_dir && $perlbrew perl -Ilib -e \"use Deploy::Config; use Deploy::Ubic; my \\\$c = Deploy::Config->new(app_home => q{$app_dir}); my \\\$u = Deploy::Ubic->new(config => \\\$c); \\\$u->generate_all; \\\$u->install_symlinks; print qq{Ubic files generated and symlinked\\n}\"'") == 0
+    or die "Failed to generate ubic service files\n";
 
 # --- Step 9: Start the app via ubic ---
 say "--- Starting 321.do via ubic ---";

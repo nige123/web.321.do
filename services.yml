@@ -4,8 +4,10 @@ services:
     repo: /home/s3/321.do
     branch: master
     bin: bin/321.pl
-    restart: hypnotoad
-    port: 9999
+    mode: production
+    runner: hypnotoad
+    perlbrew: perl-5.42.1
+    port: 9321
     logs:
       stdout: /tmp/321.do.stdout.log
       stderr: /tmp/321.do.stderr.log
@@ -17,12 +19,13 @@ services:
     repo: /home/s3/api.123.do
     branch: master
     bin: bin/app.pl
-    restart: hypnotoad
+    mode: production
+    runner: hypnotoad
     port: 9123
     logs:
-      stdout: /tmp/123do.api.stdout.log
-      stderr: /tmp/123do.api.stderr.log
-      ubic: /tmp/123do.api.ubic.log
+      stdout: /tmp/123.api.stdout.log
+      stderr: /tmp/123.api.stderr.log
+      ubic: /tmp/123.api.ubic.log
       app: /tmp/123.api.stdout.log
     env:
       MOJO_MODE: production
@@ -31,11 +34,12 @@ services:
     repo: /home/s3/web.123.do
     branch: master
     bin: script/web_123_do
-    restart: hypnotoad
+    mode: production
+    runner: hypnotoad
     port: 8123
     logs:
-      stdout: /tmp/web.123.do.stdout.log
-      stderr: /tmp/web.123.do.stderr.log
+      stdout: /tmp/123.web.do.stdout.log
+      stderr: /tmp/123.web.do.stderr.log
     env:
       MOJO_MODE: production
 
@@ -43,7 +47,8 @@ services:
     repo: /home/s3/nigelhamilton.com/mojo
     branch: master
     bin: script/nh
-    restart: hypnotoad
+    mode: production
+    runner: hypnotoad
     port: 7007
     perlbrew: perl-5.42.1
     logs:
