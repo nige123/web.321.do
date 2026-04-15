@@ -67,7 +67,7 @@ Three places to look, in order:
 
 If something's wrong, the failing step is auto-expanded on the `deploy` tab with the full output.
 
-### 4. Deploy updates — phase 2, repeatable
+### 4. Deploy updates — phase 2, repeatable (DEPLOY button)
 
 Click **DEPLOY** on the service detail. Or from the CLI:
 
@@ -75,9 +75,28 @@ Click **DEPLOY** on the service detail. Or from the CLI:
 321 go foo.web
 ```
 
-This is `git pull` + `cpanm --installdeps .` + ubic restart + port check. Runs without sudo, no interactive prompts. Safe to click repeatedly; no nginx/cert/hosts changes happen here.
+Full pipeline: `apt_deps` → `git_pull` → `cpanm` → `migrate` (if `bin/migrate` exists) → `ubic_restart` → `port_check`. Runs without sudo, no interactive prompts. Safe to click repeatedly; no nginx/cert/hosts changes happen here.
 
 On dev, `321 go` skips the git pull — you're iterating in the checkout, restart just picks up your local changes.
+
+---
+
+## Lifecycle actions
+
+Four buttons on the service detail page:
+
+- **DEPLOY** — full pipeline: `apt_deps` → `git_pull` → `cpanm` → `migrate` (if `bin/migrate` exists) → `ubic_restart` → `port_check`.
+- **UPDATE** — `git_pull` + `cpanm` + `migrate`. No restart. Useful when you want to pull new code and migrate the DB before bouncing the service.
+- **MIGRATE** — `bin/migrate` only. For re-running migrations without a code pull.
+- **RESTART** — `ubic_restart` + `port_check` only. For picking up env or config changes without touching code.
+
+Each renders per-step output in the same collapsible panel as DEPLOY; failed steps auto-expand.
+
+### Migration convention
+
+Drop a `bin/migrate` executable in the service repo. 321 invokes it with `PERL5LIB=<repo>/local/lib/perl5` and `PATH=<repo>/local/bin:$PATH` so the script can `use` your repo-local modules. Non-zero exit aborts the deploy before restart; the full stdout+stderr appears in the deploy log panel.
+
+Pick whatever migration tool fits — `DBIx::Migration`, `App::Sqitch`, plain `psql -f migrations/<ts>.sql`, a `make migrate` shim. 321 only cares about the exit code.
 
 ---
 
