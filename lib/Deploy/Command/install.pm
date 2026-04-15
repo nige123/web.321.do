@@ -59,14 +59,19 @@ sub run ($self, @args) {
             printf "  [%s] %s\n", ($s ? 'OK' : 'WARN'), $step->{step};
         }
 
-        say "  Requesting SSL certificate for $host...";
-        my $cert = $self->nginx->certbot($name);
+        my $target = $self->config->target;
+        my $provider = $self->nginx->cert_provider->pick($target);
+        say "  Requesting SSL certificate for $host via $provider...";
+        my $cert = $self->nginx->acquire_cert($name);
         if ($cert->{status} eq 'ok') {
-            say "  [OK] SSL cert ready";
+            say "  [OK] SSL cert ready ($provider)";
             $self->nginx->generate($name);
             $self->nginx->reload;
         } else {
-            warn "  [WARN] Certbot failed — run: sudo certbot certonly --standalone -d $host\n";
+            my $hint = $provider eq 'mkcert'
+                ? "    brew install mkcert   # or: sudo apt install mkcert\n    mkcert -install\n"
+                : "    sudo certbot certonly --standalone -d $host\n";
+            warn "  [WARN] $provider failed:\n$hint";
         }
     } else {
         say "  [SKIP] No host/port, skipping nginx";
