@@ -94,6 +94,23 @@ Service-name arguments accept prefix/substring matches (see `Deploy::Command::re
 
 HTTP Basic Auth required in production — credentials `321:kaizen`. Accepted via `Authorization: Basic …` header or `https://321:kaizen@…` URL userinfo. Auth is skipped in development mode and `/health` is always public.
 
+## Dev parity
+
+Dev mirrors production byte-for-byte — same nginx templates, same `listen 443 ssl`, same proxy headers. Two mechanisms keep it that way:
+
+1. **`/etc/hosts` managed block** — `321 generate` (and `321 install`) rewrite the block between `# BEGIN 321.do managed` / `# END 321.do managed` with every dev-target hostname across `services/*.yml`. Non-managed lines are never touched. Needs sudo for the write; print the desired block with `321 hosts --print` first if you want to inspect.
+
+2. **mkcert instead of certbot** — on dev targets, `Deploy::CertProvider` emits `mkcert -cert-file … -key-file …` commands; on live targets, certbot as before. Install once per dev machine:
+
+   ```
+   sudo apt install libnss3-tools mkcert   # or: brew install mkcert
+   mkcert -install                         # installs the local CA into the system + Firefox/Chrome trust stores
+   ```
+
+   Cert files land in `~/.local/share/mkcert/<host>.pem`. The nginx template reads those paths the same way it reads letsencrypt paths in prod — no conditional blocks.
+
+Prod never needs mkcert; dev never needs certbot. Both still use the same `Deploy::Nginx` templates.
+
 ## Development
 
 ```bash
