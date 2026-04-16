@@ -2,10 +2,10 @@ use Ubic::Service::SimpleDaemon;
 
 my $LOG_ROOT = '/tmp';
 
-# 321.web (production via hypnotoad) — generated from services.yml
+# 321.web (development via morbo) — generated from services.yml
 Ubic::Service::SimpleDaemon->new(
-    cwd         =>  '/home/s3/321.do',
-    bin         =>  'perlbrew exec --with perl-5.42.1 env MOJO_MODE=production hypnotoad -f /home/s3/321.do/bin/321.pl',
+    cwd         =>  '/home/s3/web.321.do',
+    bin         =>  'perlbrew exec --with perl-5.42.0 env PATH=\'/home/s3/web.321.do/local/bin:/home/nige/.local/bin:/home/nige/bin:/home/nige/perl5/perlbrew/bin:/home/nige/perl5/perlbrew/perls/perl-5.42.0/bin:/home/nige/sdk/go/bin:/home/nige/.local/bin:/home/nige/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/nige/.claude/plugins/cache/claude-plugins-official/frontend-design/unknown/bin:/home/nige/.claude/plugins/cache/claude-plugins-official/superpowers/5.0.7/bin:/home/nige/.claude/plugins/cache/claude-plugins-official/code-simplifier/1.0.0/bin:/home/nige/.claude/plugins/cache/claude-plugins-official/github/unknown/bin:/home/nige/.claude/plugins/cache/claude-plugins-official/feature-dev/unknown/bin:/home/nige/.claude/plugins/cache/claude-plugins-official/slack/1.0.0/bin:/home/nige/.claude/plugins/cache/claude-plugins-official/stripe/0.1.0/bin\' PERL5LIB=\'/home/s3/web.321.do/local/lib/perl5\' morbo -l http://127.0.0.1:9321 /home/s3/web.321.do/bin/321.pl',
     stdout      =>  '/tmp/321.do.stdout.log',
     stderr      =>  '/tmp/321.do.stderr.log',
     ubic_log    =>  '/tmp/321.do.ubic.log',
