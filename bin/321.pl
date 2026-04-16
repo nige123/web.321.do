@@ -1658,6 +1658,7 @@ body::after {
     align-items: center;
     justify-content: center;
     gap: 8px;
+    text-decoration: none;
 }
 
 .add-subsystem-btn:hover {
@@ -2197,7 +2198,7 @@ async function loadServices() {
 
     // Add "ADD SUBSYSTEM" link card
     const addCard = document.createElement('div');
-    addCard.innerHTML = `<a href="/ui/add" class="add-subsystem-btn">+ ADD SUBSYSTEM</a>`;
+    addCard.innerHTML = `<a href="/ui/add" class="add-subsystem-btn">+ ADD SERVICE</a>`;
     grid.appendChild(addCard);
 }
 
