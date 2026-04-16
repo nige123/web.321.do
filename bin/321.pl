@@ -2031,7 +2031,7 @@ async function svcAction(name, action) {
     } catch(e) {
         toast(action + ' error: ' + e.message, 'error');
     }
-    setTimeout(loadServices, 2000);
+    loadServices();
 }
 
 async function deployService(name, btn, isDev = false) {
