@@ -10,7 +10,7 @@ use Mojo::Util qw(decode);
 app->config(hypnotoad => {listen => ['http://127.0.0.1:9321']});
 unshift @{app->commands->namespaces}, 'Deploy::Command';
 
-my $app_home = curfile->dirname->dirname;
+my $app_home = $ENV{APP_HOME} // curfile->dirname->dirname;
 use lib curfile->dirname->dirname->child('lib')->to_string;
 
 use Deploy::Config;
@@ -18,6 +18,7 @@ use Deploy::Service;
 use Deploy::Logs;
 use Deploy::Ubic;
 use Deploy::Nginx;
+use Deploy::Secrets;
 use Text::Markdown qw(markdown);
 
 # --- Config ---
@@ -44,6 +45,8 @@ my $nginx_mgr = Deploy::Nginx->new(
     log    => app->log,
 );
 
+my $secrets_mgr = Deploy::Secrets->new(app_home => $app_home);
+
 # --- Helpers ---
 
 # App-level accessors for command modules
@@ -57,6 +60,7 @@ helper svc_mgr   => sub { $service_mgr };
 helper log_mgr   => sub { $logs_mgr };
 helper ubic_mgr  => sub { $ubic_mgr };
 helper nginx_mgr => sub { $nginx_mgr };
+helper secrets_mgr => sub { $secrets_mgr };
 
 helper active_target => sub ($c) {
     return $c->cookie('target') // (app->mode eq 'development' ? 'dev' : 'live');
@@ -390,6 +394,57 @@ post '/service/#name/nginx/certbot' => sub ($c) {
     } else {
         $c->json_response(error => "Certbot failed", $result);
     }
+};
+
+# --- Secrets ---
+
+get '/service/#name/secrets' => sub ($c) {
+    my $name = $c->param('name');
+    return unless $c->validate_service($name);
+    my $svc = $config->service($name);
+
+    my $diff = $secrets_mgr->diff($name, {
+        required => $svc->{env_required} // {},
+        optional => $svc->{env_optional} // {},
+    });
+    $c->json_response(success => 'ok', {
+        required     => [ sort keys %{ $svc->{env_required} // {} } ],
+        optional     => $svc->{env_optional} // {},
+        missing      => $diff->{missing},
+        present      => $diff->{present},
+        optional_set => $diff->{optional_set},
+    });
+};
+
+post '/service/#name/secrets' => sub ($c) {
+    my $name = $c->param('name');
+    return unless $c->validate_service($name);
+    my $body = $c->req->json // {};
+    my $key  = $body->{key};
+    my $val  = $body->{value} // '';
+    return $c->json_response(error => 'key required') unless $key;
+
+    my $ok = eval {
+        $secrets_mgr->set($name, $key, $val, actor => '321');
+        1;
+    };
+    return $c->json_response(error => ($@ // 'set failed')) unless $ok;
+    $c->json_response(success => "set $key for $name");
+};
+
+post '/service/#name/secrets/delete' => sub ($c) {
+    my $name = $c->param('name');
+    return unless $c->validate_service($name);
+    my $body = $c->req->json // {};
+    my $key  = $body->{key};
+    return $c->json_response(error => 'key required') unless $key;
+
+    my $ok = eval {
+        $secrets_mgr->delete($name, $key, actor => '321');
+        1;
+    };
+    return $c->json_response(error => ($@ // 'delete failed')) unless $ok;
+    $c->json_response(success => "deleted $key from $name");
 };
 
 # --- Target switch ---
