@@ -4,8 +4,9 @@ use Mojo::Base -base, -signatures;
 use YAML::XS qw(LoadFile DumpFile);
 use Path::Tiny qw(path);
 use Mojo::File qw(curfile);
+use Deploy::Manifest;
 
-has 'app_home'    => sub { curfile->dirname->dirname->dirname };
+has 'app_home'    => sub { $ENV{APP_HOME} // curfile->dirname->dirname->dirname };
 has 'target'      => 'live';
 has '_services'   => sub ($self) { $self->_load_all };
 
@@ -96,21 +97,33 @@ sub _resolve ($self, $name, $raw) {
     my $targets = $raw->{targets} // {};
     my $target  = $targets->{$target_name} // $targets->{live} // {};
 
+    my $manifest = $raw->{repo} && -d $raw->{repo}
+        ? Deploy::Manifest->load($raw->{repo})
+        : undef;
+
+    my $bin      = $raw->{bin}      // ($manifest ? $manifest->{entry}  : undef);
+    my $perlbrew = $raw->{perlbrew} // ($manifest ? $manifest->{perl}   : undef);
+    my $runner   = $target->{runner} // ($manifest ? $manifest->{runner} : 'hypnotoad');
+    my $health   = ($manifest ? $manifest->{health} : '/health');
+
     return {
-        name     => $name,
-        repo     => $raw->{repo},
-        branch   => $raw->{branch} // 'master',
-        bin      => $raw->{bin},
-        mode     => ($target->{runner} // 'hypnotoad') eq 'morbo' ? 'development' : 'production',
-        runner   => $target->{runner} // 'hypnotoad',
-        port     => $target->{port},
-        logs     => $target->{logs} // {},
-        env      => $target->{env} // {},
-        host     => $target->{host} // 'localhost',
-        apt_deps => $raw->{apt_deps} // [],
+        name         => $name,
+        repo         => $raw->{repo},
+        branch       => $raw->{branch} // 'master',
+        bin          => $bin,
+        mode         => $runner eq 'morbo' ? 'development' : 'production',
+        runner       => $runner,
+        port         => $target->{port},
+        logs         => $target->{logs} // {},
+        env          => $target->{env} // {},
+        host         => $target->{host} // 'localhost',
+        health       => $health,
+        apt_deps     => $raw->{apt_deps} // [],
+        env_required => $manifest ? $manifest->{env_required} : {},
+        env_optional => $manifest ? $manifest->{env_optional} : {},
         ($target->{docs}  ? (docs  => $target->{docs})  : ()),
         ($target->{admin} ? (admin => $target->{admin}) : ()),
-        ($raw->{perlbrew}  ? (perlbrew => $raw->{perlbrew}) : ()),
+        ($perlbrew        ? (perlbrew => $perlbrew)      : ()),
     };
 }
 
