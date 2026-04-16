@@ -2961,6 +2961,10 @@ setInterval(loadStatus, 10000);
     color: var(--text-0);
     padding: 0;
 }
+.doc-panel table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 14px; }
+.doc-panel th { text-align: left; padding: 8px 12px; border-bottom: 2px solid var(--border-hi); color: var(--phosphor-mid); font-weight: 600; letter-spacing: 1px; font-size: 12px; }
+.doc-panel td { padding: 6px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+.doc-panel tr:last-child td { border-bottom: none; }
 .doc-panel a { color: var(--cyan); text-decoration: none; border-bottom: 1px dotted var(--cyan); }
 .doc-panel a:hover { color: var(--phosphor); border-bottom-color: var(--phosphor); }
 .doc-panel hr { border: none; border-top: 1px solid var(--border); margin: 24px 0; }
