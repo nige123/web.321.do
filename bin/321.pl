@@ -516,7 +516,7 @@ __DATA__
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title><%= title %> — 321.do MISSION CONTROL</title>
+<title><%= title %> — 321.do</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23010a01'/%3E%3Cpolygon points='12,8 12,24 26,16' fill='%2300ff41'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600;700&family=Orbitron:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -1046,6 +1046,13 @@ body::after {
     display: inline-flex;
     align-items: center;
     gap: 6px;
+}
+
+.btn-icon {
+    width: 14px;
+    height: 14px;
+    fill: currentColor;
+    flex-shrink: 0;
 }
 
 .btn:hover {
@@ -2040,7 +2047,7 @@ body::after {
 % if (app->mode eq 'development') {
     <div class="dev-badge">DEV MODE</div>
 % }
-    <div class="mission-title">MISSION CONTROL</div>
+    <div class="mission-title">SERVICES</div>
     <a href="/docs" class="mission-link">DOCS</a>
     <div class="target-switch" id="target-switch"></div>
     <div class="mission-clock" id="mission-clock">--:--:--</div>
@@ -2289,11 +2296,11 @@ async function loadServices() {
                 <a href="/ui/service/${svc.name}" class="btn">CONFIG</a>
             </div>
             <div class="svc-actions svc-controls">
-                <button class="btn btn-ctrl" onclick="svcAction('${svc.name}','start')">START</button>
-                <button class="btn btn-ctrl" onclick="svcAction('${svc.name}','restart')">RESTART</button>
-                <button class="btn btn-ctrl btn-tint btn-stop" onclick="svcAction('${svc.name}','stop')">STOP</button>
+                <button class="btn btn-ctrl" onclick="svcAction('${svc.name}','start')"><svg class="btn-icon" viewBox="0 0 16 16"><polygon points="4,2 4,14 14,8"/></svg> START</button>
+                <button class="btn btn-ctrl" onclick="svcAction('${svc.name}','restart')"><svg class="btn-icon" viewBox="0 0 16 16"><path d="M13,8A5,5 0 1,1 8,3" fill="none" stroke="currentColor" stroke-width="1.5"/><polygon points="8,0.5 8,5.5 11.5,3"/></svg> RESTART</button>
+                <button class="btn btn-ctrl btn-tint btn-stop" onclick="svcAction('${svc.name}','stop')"><svg class="btn-icon" viewBox="0 0 16 16"><rect x="3" y="3" width="10" height="10"/></svg> STOP</button>
                 <button class="${deployBtnClass}" onclick="deployService('${svc.name}', this, ${isDev})" id="deploy-btn-${svc.name.replace(/\./g,'_')}">
-                    ${deployLabel}
+                    <svg class="btn-icon" viewBox="0 0 16 16"><polygon points="4,2 4,14 14,8"/></svg> ${deployLabel}
                 </button>
             </div>
             <div class="deploy-output" id="deploy-out-${svc.name.replace(/\./g,'_')}"></div>
@@ -2382,12 +2389,12 @@ setInterval(loadServices, 30000);
                 <dt>REPO</dt><dd id="m-repo">&mdash;</dd>
             </dl>
             <button class="btn btn-deploy" id="deploy-btn" onclick="deploy()" style="width:100%;justify-content:center">
-                DEPLOY
+                <svg class="btn-icon" viewBox="0 0 16 16"><polygon points="4,2 4,14 14,8"/></svg> DEPLOY
             </button>
             <div class="lifecycle-row">
-                <button class="btn btn-tint btn-docs"  id="update-btn"  onclick="lifecycle('update')"  title="git pull + cpanm + migrate, no restart">UPDATE</button>
-                <button class="btn btn-tint btn-admin" id="migrate-btn" onclick="lifecycle('migrate')" title="Run bin/migrate only">MIGRATE</button>
-                <button class="btn btn-tint btn-stop"  id="restart-btn" onclick="lifecycle('restart')" title="ubic restart + port check">RESTART</button>
+                <button class="btn btn-tint btn-docs"  id="update-btn"  onclick="lifecycle('update')"  title="git pull + cpanm + migrate, no restart"><svg class="btn-icon" viewBox="0 0 16 16"><path d="M8,2 L8,11 M4,7 L8,11 L12,7" fill="none" stroke="currentColor" stroke-width="1.5"/></svg> UPDATE</button>
+                <button class="btn btn-tint btn-admin" id="migrate-btn" onclick="lifecycle('migrate')" title="Run bin/migrate only"><svg class="btn-icon" viewBox="0 0 16 16"><path d="M3,5 L8,5 M3,8 L13,8 M3,11 L10,11" fill="none" stroke="currentColor" stroke-width="1.5"/></svg> MIGRATE</button>
+                <button class="btn btn-tint btn-stop"  id="restart-btn" onclick="lifecycle('restart')" title="ubic restart + port check"><svg class="btn-icon" viewBox="0 0 16 16"><path d="M13,8A5,5 0 1,1 8,3" fill="none" stroke="currentColor" stroke-width="1.5"/><polygon points="8,0.5 8,5.5 11.5,3"/></svg> RESTART</button>
             </div>
             <a id="visit-btn" href="#" target="_blank" rel="noopener"
                class="btn btn-tint btn-visit"
