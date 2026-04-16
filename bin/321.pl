@@ -2974,10 +2974,10 @@ setInterval(loadStatus, 10000);
 
 @@ add_subsystem.html.ep
 % layout 'ops';
-% title 'Add Subsystem';
+% title 'Add Service';
 
 <div class="page-header">
-    <div class="page-title"><a href="/" class="back-link">&larr;</a> Add Subsystem</div>
+    <div class="page-title"><a href="/" class="back-link">&larr;</a> Add Service</div>
 </div>
 
 <div class="add-page-grid">
