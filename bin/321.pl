@@ -2148,10 +2148,6 @@ setInterval(updateClock, 1000);
 % content_for scripts => begin
 <script>
 async function loadServices() {
-    // Don't clobber the form if the user is typing in it
-    const addName = document.getElementById('add-name');
-    if (addName && addName.value.trim()) return;
-
     const d = await api('/services');
     if (d.status !== 'success') return;
     const grid = document.getElementById('svc-grid');
@@ -2199,55 +2195,10 @@ async function loadServices() {
         grid.appendChild(card);
     });
 
-    // Add "ADD SUBSYSTEM" card
+    // Add "ADD SUBSYSTEM" link card
     const addCard = document.createElement('div');
-    addCard.innerHTML = `<div class="add-subsystem-form" id="add-form">
-        <div class="add-form-title">+ ADD SUBSYSTEM</div>
-        <div class="config-row"><span class="config-label">NAME</span><input class="config-input" id="add-name" placeholder="myapp.web"></div>
-        <div class="config-row"><span class="config-label">REPO</span><input class="config-input" id="add-repo" placeholder="/home/s3/myapp"></div>
-        <div class="config-row"><span class="config-label">BIN</span><input class="config-input" id="add-bin" value="bin/app.pl"></div>
-        <div class="config-row"><span class="config-label">PORT</span><input class="config-input" id="add-port" placeholder="8080"></div>
-        <div style="padding-top:8px"><button class="btn btn-deploy" onclick="addSubsystem()" style="width:100%;justify-content:center">CREATE</button></div>
-    </div>`;
+    addCard.innerHTML = `<a href="/ui/add" class="add-subsystem-btn">+ ADD SUBSYSTEM</a>`;
     grid.appendChild(addCard);
-}
-
-async function addSubsystem() {
-    const name = document.getElementById('add-name').value.trim();
-    if (!name) { toast('Enter a service name', 'error'); return; }
-    if (!/^[a-z0-9]+\.[a-z0-9]+$/.test(name)) {
-        toast('Name must be group.service (e.g. myapp.web)', 'error');
-        return;
-    }
-    const repo = document.getElementById('add-repo').value.trim() || '/home/s3/' + name.split('.')[0];
-    const bin = document.getElementById('add-bin').value.trim() || 'bin/app.pl';
-    const port = document.getElementById('add-port').value.trim();
-    const data = {
-        name: name,
-        repo: repo,
-        branch: 'master',
-        bin: bin,
-        targets: {
-            live: { port: port, runner: 'hypnotoad', env: {}, logs: {} },
-            dev: { port: port, runner: 'morbo', env: {}, logs: {} },
-        },
-    };
-    try {
-        const d = await api('/services/create', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data),
-        });
-        if (d.status === 'success') {
-            toast(name + ' created');
-            loadServices();
-            loadGitStatus();
-        } else {
-            toast(d.message || 'Create failed', 'error');
-        }
-    } catch(e) {
-        toast('Error: ' + e.message, 'error');
-    }
 }
 
 async function svcAction(name, action) {
