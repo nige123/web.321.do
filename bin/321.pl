@@ -495,6 +495,10 @@ get '/ui/service/#name' => sub ($c) {
     $c->render('service_detail');
 };
 
+get '/ui/add' => sub ($c) {
+    $c->render('add_subsystem');
+};
+
 get '/docs' => sub ($c) {
     my $file = $app_home->child('docs', 'ops.md');
     return $c->render(text => 'Docs not found', status => 404) unless -f $file;
