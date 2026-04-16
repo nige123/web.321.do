@@ -1,0 +1,10 @@
+name: 321.web
+entry: bin/321.pl
+runner: hypnotoad
+perl: perl-5.42.0
+health: /health
+env_required:
+  MOJO_MODE: "production or development"
+env_optional:
+  DEPLOY_TOKEN:
+    desc: "Token for remote deploy endpoint"
