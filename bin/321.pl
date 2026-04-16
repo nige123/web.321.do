@@ -444,6 +444,7 @@ __DATA__
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title><%= title %> — 321.do MISSION CONTROL</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23010a01'/%3E%3Ccircle cx='16' cy='16' r='12' stroke='%2300ff41' stroke-width='1.5' fill='none' opacity='.4'/%3E%3Ccircle cx='16' cy='16' r='12' stroke='%2300ff41' stroke-width='2' stroke-dasharray='75' stroke-dashoffset='56' fill='none'/%3E%3Cline x1='16' y1='2' x2='16' y2='6' stroke='%2300ff41' stroke-width='.7' opacity='.5'/%3E%3Cline x1='16' y1='26' x2='16' y2='30' stroke='%2300ff41' stroke-width='.7' opacity='.5'/%3E%3Cline x1='2' y1='16' x2='6' y2='16' stroke='%2300ff41' stroke-width='.7' opacity='.5'/%3E%3Cline x1='26' y1='16' x2='30' y2='16' stroke='%2300ff41' stroke-width='.7' opacity='.5'/%3E%3Ctext x='16' y='20' text-anchor='middle' fill='%2300ff41' font-family='sans-serif' font-weight='900' font-size='10'%3E321%3C/text%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600;700&family=Orbitron:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
