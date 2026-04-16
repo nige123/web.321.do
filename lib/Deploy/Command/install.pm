@@ -34,6 +34,16 @@ sub run ($self, @args) {
         }
     }
 
+    # Step 1b: Validate manifest
+    require Deploy::Manifest;
+    my $manifest = Deploy::Manifest->load($repo);
+    unless ($manifest) {
+        die "\n  No .321.yml in $repo\n"
+          . "  Every service repo must ship a manifest.\n"
+          . "  See CLAUDE.md -> Service Repo Contract\n";
+    }
+    say "  [OK] Manifest: $manifest->{name} ($manifest->{runner}, $manifest->{entry})";
+
     # Step 2: Install deps
     say "  Installing dependencies...";
     my $ok = $self->run_cpanm($repo, $perlbrew);
