@@ -2879,3 +2879,227 @@ setInterval(loadStatus, 10000);
 .doc-panel em { color: var(--text-0); font-style: italic; }
 </style>
 
+@@ add_subsystem.html.ep
+% layout 'ops';
+% title 'Add Subsystem';
+
+<div class="page-header">
+    <div class="page-title"><a href="/" class="back-link">&larr;</a> Add Subsystem</div>
+</div>
+
+<div class="add-page-grid">
+    <div class="add-page-form">
+        <div class="detail-info">
+            <h2 class="add-section-title">Register a new service</h2>
+
+            <div class="config-row">
+                <span class="config-label">NAME</span>
+                <input class="config-input" id="add-name" placeholder="pizza.web" autocomplete="off">
+            </div>
+            <div class="add-field-hint">Format: <code>group.service</code> &mdash; e.g. pizza.web, blog.api</div>
+
+            <div class="config-row">
+                <span class="config-label">REPO</span>
+                <input class="config-input" id="add-repo" placeholder="/home/s3/web.pizza.do" autocomplete="off">
+            </div>
+            <div class="add-field-hint">Where the code lives (or will live after clone)</div>
+
+            <div class="config-row">
+                <span class="config-label">BRANCH</span>
+                <input class="config-input" id="add-branch" value="master" autocomplete="off">
+            </div>
+
+            <h3 class="add-target-title">Dev target</h3>
+            <div class="add-target-row">
+                <div class="config-row">
+                    <span class="config-label">HOST</span>
+                    <input class="config-input" id="add-dev-host" placeholder="pizza.do.dev" autocomplete="off">
+                </div>
+                <div class="config-row">
+                    <span class="config-label">PORT</span>
+                    <input class="config-input" id="add-dev-port" placeholder="9500" autocomplete="off">
+                </div>
+            </div>
+
+            <h3 class="add-target-title">Live target</h3>
+            <div class="add-target-row">
+                <div class="config-row">
+                    <span class="config-label">HOST</span>
+                    <input class="config-input" id="add-live-host" placeholder="pizza.do" autocomplete="off">
+                </div>
+                <div class="config-row">
+                    <span class="config-label">PORT</span>
+                    <input class="config-input" id="add-live-port" placeholder="9500" autocomplete="off">
+                </div>
+            </div>
+
+            <div style="padding-top:16px">
+                <button class="btn btn-deploy" id="create-btn" onclick="createSubsystem()" style="width:100%;justify-content:center">
+                    CREATE
+                </button>
+            </div>
+            <div id="create-error" class="add-error" style="display:none"></div>
+        </div>
+    </div>
+
+    <div class="add-page-guide">
+        <div class="detail-info">
+            <h2 class="add-section-title">Example</h2>
+            <div class="add-example">
+                <div class="add-example-row"><span class="add-ex-label">NAME</span> <span class="add-ex-value">pizza.web</span></div>
+                <div class="add-example-row"><span class="add-ex-label">REPO</span> <span class="add-ex-value">/home/s3/web.pizza.do</span></div>
+                <div class="add-example-row"><span class="add-ex-label">BRANCH</span> <span class="add-ex-value">master</span></div>
+                <div class="add-example-row"><span class="add-ex-label">DEV</span> <span class="add-ex-value">pizza.do.dev :9500</span></div>
+                <div class="add-example-row"><span class="add-ex-label">LIVE</span> <span class="add-ex-value">pizza.do :9500</span></div>
+            </div>
+            <p class="add-guide-text">
+                The <strong>name</strong> is <code>group.service</code> &mdash; the group drives the ubic service tree, the repo directory name, and the nginx config.
+                The <strong>repo</strong> is where the code lives on disk. Convention is <code>/home/s3/web.&lt;group&gt;.do</code> for web services.
+                <strong>Dev host</strong> gets a <code>.dev</code> suffix; mkcert handles local SSL. Pick an <strong>unused port</strong> &mdash; check the dashboard for what&rsquo;s taken.
+            </p>
+
+            <h2 class="add-section-title" style="margin-top:24px">What&rsquo;s next?</h2>
+            <ol class="add-steps">
+                <li>
+                    <strong>Prepare the repo</strong> &mdash; make sure it exists and contains a <code>.321.yml</code> manifest at the root. Minimum:
+                    <pre class="add-code">name: pizza.web
+entry: bin/app.pl
+runner: hypnotoad</pre>
+                </li>
+                <li>
+                    <strong>Install the service</strong> &mdash; from the 321.do machine:
+                    <pre class="add-code">321 install pizza.web</pre>
+                    This clones the repo (if needed), installs Perl deps, sets up ubic + nginx + SSL, and starts the service.
+                </li>
+                <li>
+                    <strong>Set secrets</strong> &mdash; if the manifest declares <code>env_required</code>, set them from the service detail page before deploying.
+                </li>
+                <li>
+                    <strong>Check the dashboard</strong> &mdash; the service should appear with a green status LED.
+                </li>
+            </ol>
+
+            <h2 class="add-section-title" style="margin-top:24px">Tips</h2>
+            <ul class="add-tips">
+                <li><strong>Ports</strong> &mdash; check the dashboard for ports already in use before picking one.</li>
+                <li><strong>Naming</strong> &mdash; keep the group name short and lowercase. It&rsquo;s reused everywhere: ubic tree, repo dir, nginx config.</li>
+                <li><strong>Dev parity</strong> &mdash; dev targets get the same nginx + SSL setup as live via mkcert. Run <code>321 hosts</code> after install to update <code>/etc/hosts</code>.</li>
+                <li><strong>Branch</strong> &mdash; most services use <code>master</code>. Use <code>main</code> if that&rsquo;s what the repo uses.</li>
+                <li><strong>No bin/runner field?</strong> &mdash; those come from the <code>.321.yml</code> manifest in the service repo, not from deploy config.</li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+%= content_for 'scripts' => begin
+<script>
+const nameInput = document.getElementById('add-name');
+const repoInput = document.getElementById('add-repo');
+const devHostInput = document.getElementById('add-dev-host');
+const liveHostInput = document.getElementById('add-live-host');
+const devPortInput = document.getElementById('add-dev-port');
+const livePortInput = document.getElementById('add-live-port');
+
+nameInput.addEventListener('input', function() {
+    const name = this.value.trim();
+    const group = name.split('.')[0];
+    if (group && !repoInput.dataset.touched) {
+        repoInput.value = '/home/s3/web.' + group + '.do';
+    }
+    if (group && !devHostInput.dataset.touched) {
+        devHostInput.value = group + '.do.dev';
+    }
+    if (group && !liveHostInput.dataset.touched) {
+        liveHostInput.value = group + '.do';
+    }
+});
+
+devPortInput.addEventListener('input', function() {
+    if (!livePortInput.dataset.touched) {
+        livePortInput.value = this.value;
+    }
+});
+
+[repoInput, devHostInput, liveHostInput, livePortInput].forEach(el => {
+    el.addEventListener('input', function() { this.dataset.touched = '1'; });
+});
+
+async function createSubsystem() {
+    const errEl = document.getElementById('create-error');
+    errEl.style.display = 'none';
+
+    const name = nameInput.value.trim();
+    if (!name) { showError('Enter a service name'); return; }
+    if (!/^[a-z0-9]+\.[a-z0-9]+$/.test(name)) {
+        showError('Name must be group.service (e.g. pizza.web)');
+        return;
+    }
+
+    const repo = repoInput.value.trim();
+    if (!repo) { showError('Enter a repo path'); return; }
+
+    const branch = document.getElementById('add-branch').value.trim() || 'master';
+    const devHost = devHostInput.value.trim();
+    const devPort = devPortInput.value.trim();
+    const liveHost = liveHostInput.value.trim();
+    const livePort = livePortInput.value.trim();
+
+    if (!devPort && !livePort) { showError('Enter at least one port'); return; }
+
+    const data = {
+        name: name,
+        repo: repo,
+        branch: branch,
+        targets: {},
+    };
+
+    if (devPort) {
+        data.targets.dev = {
+            host: devHost || 'localhost',
+            port: parseInt(devPort, 10),
+            runner: 'morbo',
+            env: {},
+            logs: {},
+        };
+    }
+    if (livePort) {
+        data.targets.live = {
+            host: liveHost || 'localhost',
+            port: parseInt(livePort, 10),
+            runner: 'hypnotoad',
+            env: {},
+            logs: {},
+        };
+    }
+
+    const btn = document.getElementById('create-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> CREATING...';
+
+    try {
+        const d = await api('/services/create', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+        });
+        if (d.status === 'success') {
+            window.location.href = '/ui/service/' + name;
+        } else {
+            showError(d.message || 'Create failed');
+        }
+    } catch(e) {
+        showError('Error: ' + e.message);
+    }
+
+    btn.disabled = false;
+    btn.textContent = 'CREATE';
+}
+
+function showError(msg) {
+    const el = document.getElementById('create-error');
+    el.textContent = msg;
+    el.style.display = 'block';
+}
+</script>
+% end
+
