@@ -471,14 +471,26 @@ body::after {
     filter: drop-shadow(0 0 6px rgba(0, 255, 65, 0.3));
 }
 
-.mission-title {
-    font-family: var(--display);
-    font-size: 18px;
-    font-weight: 500;
-    letter-spacing: 4px;
+.mission-sep {
     color: var(--text-2);
-    text-transform: uppercase;
-    white-space: nowrap;
+    font-size: 20px;
+    opacity: 0.4;
+    margin: 0 2px;
+}
+
+.mission-nav {
+    font-family: var(--display);
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: 3px;
+    color: var(--text-2);
+    text-decoration: none;
+    padding: 4px 8px;
+    transition: color 150ms;
+}
+
+.mission-nav:hover {
+    color: var(--phosphor);
 }
 
 .dev-badge {
@@ -490,23 +502,6 @@ body::after {
     border: 1px solid var(--dev-dim);
     padding: 3px 10px;
     letter-spacing: 2px;
-}
-
-.mission-link {
-    font-family: var(--display);
-    font-size: 14px;
-    font-weight: 500;
-    letter-spacing: 3px;
-    color: var(--text-2);
-    text-decoration: none;
-    padding: 4px 10px;
-    border: 1px solid transparent;
-    transition: color 120ms, border-color 120ms;
-}
-
-.mission-link:hover {
-    color: var(--phosphor);
-    border-color: var(--phosphor-faint);
 }
 
 .mission-clock {
@@ -1832,7 +1827,8 @@ body::after {
     .detail-sidebar { position: static; }
     .analysis-grid { grid-template-columns: 1fr; }
     .svc-grid { grid-template-columns: 1fr; }
-    .mission-title { display: none; }
+    .mission-nav { display: none; }
+    .mission-sep { display: none; }
     .mission-clock { font-size: 13px; }
     .add-panel { padding: 20px; }
     .add-target-fields { grid-template-columns: 1fr 100px; }
@@ -1855,13 +1851,14 @@ body::after {
         <svg class="logo-svg" width="28" height="28" viewBox="0 0 28 28" fill="none">
             <polygon points="8,4 8,24 24,14" fill="currentColor"/>
         </svg>
-        <span>.do</span>
+        <span>321.do</span>
     </a>
+    <span class="mission-sep">&rsaquo;</span>
+    <a href="/" class="mission-nav">SERVICES</a>
+    <a href="/docs" class="mission-nav">DOCS</a>
 % if (app->mode eq 'development') {
     <div class="dev-badge">DEV MODE</div>
 % }
-    <div class="mission-title">SERVICES</div>
-    <a href="/docs" class="mission-link">DOCS</a>
     <div class="target-switch" id="target-switch"></div>
     <div class="mission-clock" id="mission-clock">--:--:--</div>
     <div id="git-badge" class="git-badge synced" onclick="gitPush()" title="Click to push">
