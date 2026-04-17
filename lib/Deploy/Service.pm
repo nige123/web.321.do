@@ -5,10 +5,12 @@ use Mojo::IOLoop;
 use Path::Tiny qw(path);
 use POSIX qw(strftime);
 use Deploy::Secrets;
+use Deploy::Local;
 
 has 'config';     # Deploy::Config instance
 has 'log';        # Mojo::Log instance
 has 'ubic_mgr';   # Deploy::Ubic instance
+has 'transport' => sub { Deploy::Local->new };
 
 sub status ($self, $name) {
     my $svc = $self->config->service($name);
@@ -121,26 +123,26 @@ sub _step_apt_deps ($self, $svc) {
 
 sub _step_git_pull ($self, $svc) {
     my $branch = $svc->{branch} // 'master';
-    my ($ok, $out) = $self->_run_in_dir($svc->{repo},
+    my $r = $self->_run_in_dir($svc->{repo},
         "git fetch origin && git reset --hard origin/$branch");
-    return { step => 'git_pull', success => $ok ? \1 : \0, output => $out };
+    return { step => 'git_pull', success => $r->{ok} ? \1 : \0, output => $r->{output} };
 }
 
 sub _step_cpanm ($self, $svc) {
-    my ($ok, $out) = $self->_run_in_dir($svc->{repo}, $self->_cpanm_cmd($svc->{perlbrew}));
-    return { step => 'cpanm', success => $ok ? \1 : \0, output => $out };
+    my $r = $self->_run_in_dir($svc->{repo}, $self->_cpanm_cmd($svc->{perlbrew}));
+    return { step => 'cpanm', success => $r->{ok} ? \1 : \0, output => $r->{output} };
 }
 
 sub _step_ubic_restart ($self, $name) {
-    my ($ok, $out) = $self->_run_cmd("ubic restart $name");
-    return { step => 'ubic_restart', success => $ok ? \1 : \0, output => $out };
+    my $r = $self->_run_cmd("ubic restart $name");
+    return { step => 'ubic_restart', success => $r->{ok} ? \1 : \0, output => $r->{output} };
 }
 
 sub _step_migrate ($self, $svc) {
     my $repo = $svc->{repo};
     my $env_prefix = "PERL5LIB=$repo/local/lib/perl5 PATH=$repo/local/bin:\$PATH";
-    my ($ok, $out) = $self->_run_in_dir($repo, "$env_prefix ./bin/migrate");
-    return { step => 'migrate', success => $ok ? \1 : \0, output => $out };
+    my $r = $self->_run_in_dir($repo, "$env_prefix ./bin/migrate");
+    return { step => 'migrate', success => $r->{ok} ? \1 : \0, output => $r->{output} };
 }
 
 # Every _step_* returns { success => \1 | \0 }. Callers deref via this helper.
@@ -239,7 +241,8 @@ sub _check_apt_deps ($self, $svc) {
 
     my @missing;
     for my $pkg (@$deps) {
-        push @missing, $pkg if system("dpkg -s \Q$pkg\E >/dev/null 2>&1") != 0;
+        my $r = $self->transport->run("dpkg -s \Q$pkg\E >/dev/null 2>&1");
+        push @missing, $pkg unless $r->{ok};
     }
 
     return (1, 'all installed: ' . join(' ', @$deps)) unless @missing;
@@ -272,40 +275,17 @@ sub _deploy_result ($self, $name, $status, $message, $steps) {
 sub _run_in_dir ($self, $dir, $cmd, %opts) {
     my $timeout = $opts{timeout} // 600;
     $self->log->info("Running: cd $dir && $cmd");
-    my $output = eval {
-        local $SIG{ALRM} = sub { die "Command timed out\n" };
-        alarm $timeout;
-        my $result = `cd \Q$dir\E && $cmd 2>&1`;
-        alarm 0;
-        $result;
-    };
-    alarm 0;
-    if ($@) {
-        return (0, "Error: $@");
-    }
-    return ($? == 0, $output // '');
+    return $self->transport->run_in_dir($dir, $cmd, timeout => $timeout);
 }
 
 sub _run_cmd ($self, $cmd) {
     $self->log->info("Running: $cmd");
-    my $output = eval {
-        local $SIG{ALRM} = sub { die "Command timed out\n" };
-        alarm 120;
-        my $result = `$cmd 2>&1`;
-        alarm 0;
-        $result;
-    };
-    alarm 0;
-    if ($@) {
-        return (0, "Error: $@");
-    }
-    return ($? == 0, $output // '');
+    return $self->transport->run($cmd, timeout => 120);
 }
 
 sub _get_pid ($self, $name, $svc) {
-    # Use ubic status to get pid — works for both morbo and hypnotoad
-    my $output = `ubic status $name 2>&1`;
-    if ($output =~ /running \(pid (\d+)\)/) {
+    my $r = $self->transport->run("ubic status $name");
+    if ($r->{ok} && $r->{output} =~ /running \(pid (\d+)\)/) {
         return $1;
     }
 
@@ -322,25 +302,16 @@ sub _get_pid ($self, $name, $svc) {
 }
 
 sub _git_sha ($self, $repo) {
-    my $sha = `cd \Q$repo\E && git rev-parse --short HEAD 2>/dev/null`;
-    chomp $sha if $sha;
+    my $r = $self->transport->run_in_dir($repo, 'git rev-parse --short HEAD');
+    return undef unless $r->{ok};
+    chomp(my $sha = $r->{output});
     return $sha || undef;
 }
 
 sub _check_port ($self, $port) {
     return 0 unless $port;
-    eval {
-        require IO::Socket::INET;
-        my $sock = IO::Socket::INET->new(
-            PeerAddr => '127.0.0.1',
-            PeerPort => $port,
-            Proto    => 'tcp',
-            Timeout  => 1,
-        );
-        return 0 unless $sock;
-        close $sock;
-    };
-    return $@ ? 0 : 1;
+    my $r = $self->transport->run("bash -c 'echo > /dev/tcp/127.0.0.1/$port' 2>/dev/null", timeout => 5);
+    return $r->{ok} ? 1 : 0;
 }
 
 sub _log_deploy ($self, $name, $steps) {

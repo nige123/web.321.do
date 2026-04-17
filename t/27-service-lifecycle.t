@@ -15,7 +15,7 @@ sub generate { return { path => '/tmp/stub-ubic-path' } }
 # Subclass Deploy::Service to stub out external commands.
 package TestService;
 use parent -norequire, 'Deploy::Service';
-sub _run_cmd  { return (1, 'stubbed') }          # ubic restart always succeeds
+sub _run_cmd  { return { ok => 1, output => 'stubbed', exit_code => 0 } }  # ubic restart always succeeds
 sub _check_port { return 1 }                     # port always up
 # _run_in_dir is used for cpanm; let it run for real (tempdir repo, cpanfile present)
 
