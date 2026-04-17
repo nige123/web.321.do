@@ -299,6 +299,9 @@ get '/service/#name/nginx' => sub ($c) {
 # --- UI Routes ---
 
 get '/' => sub ($c) {
+    my $target = $c->param('target') // 'dev';
+    $config->target($target);
+    $c->stash(active_target => $target, available_targets => $c->available_targets);
     $c->render('dashboard');
 };
 
@@ -616,7 +619,47 @@ body::after {
 }
 
 .page-header {
+    display: flex;
+    align-items: center;
+    gap: 24px;
     margin-bottom: 32px;
+}
+
+.page-target-tabs {
+    display: flex;
+    gap: 4px;
+}
+
+.page-target-btn {
+    font-family: var(--display);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 6px 16px;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-2);
+    cursor: pointer;
+    transition: all 0.15s;
+    text-decoration: none;
+}
+
+.page-target-btn:hover {
+    border-color: var(--border-hi);
+    color: var(--text-1);
+}
+
+.page-target-btn.active-dev {
+    background: var(--dev-glow);
+    border-color: var(--dev-dim);
+    color: var(--dev);
+}
+
+.page-target-btn.active-live {
+    background: var(--phosphor-glow);
+    border-color: var(--phosphor-dim);
+    color: var(--phosphor);
 }
 
 .page-title {
@@ -733,23 +776,27 @@ body::after {
 
 /* ═══ CARD INTERNALS ═══ */
 
-.svc-toprow {
+.svc-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 14px;
+}
+
+.svc-header-right {
     display: flex;
     align-items: center;
     gap: 8px;
-    margin-bottom: 10px;
-}
-
-.svc-toprow-spacer {
-    flex: 1;
+    flex-shrink: 0;
 }
 
 .svc-favicon {
-    width: 16px;
-    height: 16px;
+    width: 18px;
+    height: 18px;
     object-fit: contain;
     flex-shrink: 0;
-    opacity: 0.8;
+    opacity: 0.85;
 }
 
 .svc-name {
@@ -757,13 +804,19 @@ body::after {
     font-size: 19px;
     font-weight: 600;
     letter-spacing: 1px;
-    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
 }
 
 .svc-name a {
     color: var(--text-0);
     text-decoration: none;
     transition: all 0.2s;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .svc-name a:hover {
@@ -1871,7 +1924,6 @@ body::after {
 % if (app->mode eq 'development') {
     <div class="dev-badge">DEV MODE</div>
 % }
-    <div class="target-switch" id="target-switch"></div>
     <div class="mission-clock" id="mission-clock">--:--:--</div>
     <div id="git-badge" class="git-badge synced" onclick="gitPush()" title="Click to push">
         <span id="git-status">SYNCED</span>
@@ -2023,36 +2075,8 @@ async function gitPush() {
     loadGitStatus();
 }
 
-async function loadTargets() {
-    try {
-        const d = await api('/target');
-        if (d.status !== 'success') return;
-        const sw = document.getElementById('target-switch');
-        const active = d.data.target;
-        sw.innerHTML = '';
-        d.data.available.forEach(t => {
-            const btn = document.createElement('button');
-            btn.className = 'target-btn' + (t === active ? ' active-' + t : '');
-            btn.textContent = t;
-            btn.onclick = () => switchTarget(t);
-            sw.appendChild(btn);
-        });
-    } catch(e) {}
-}
-
-async function switchTarget(target) {
-    await api('/target', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ target: target }),
-    });
-    loadTargets();
-    location.reload();
-}
-
 loadHealth();
 loadGitStatus();
-loadTargets();
 updateClock();
 setInterval(loadHealth, 15000);
 setInterval(loadGitStatus, 15000);
@@ -2067,11 +2091,15 @@ setInterval(updateClock, 1000);
 
 @@ dashboard.html.ep
 % layout 'ops';
-% title 'Dashboard';
+% title uc($active_target) . ' Services';
 
 <div class="page-header">
-    <div class="page-title">SERVICE STATUS</div>
-    <div class="page-subtitle">All subsystems monitored</div>
+    <div class="page-title"><%= uc($active_target) %> SERVICES</div>
+    <div class="page-target-tabs">
+% for my $t (@$available_targets) {
+        <a href="/?target=<%= $t %>" class="page-target-btn<%= $t eq $active_target ? ' active-' . $t : '' %>"><%= uc($t) %></a>
+% }
+    </div>
 </div>
 
 <div class="svc-grid" id="svc-grid">
@@ -2082,34 +2110,29 @@ setInterval(updateClock, 1000);
 
 % content_for scripts => begin
 <script>
+const ACTIVE_TARGET = '<%= $active_target %>';
+
 async function loadServices() {
-    const d = await api('/services');
+    const d = await api('/services?target=' + ACTIVE_TARGET);
     if (d.status !== 'success') return;
     const grid = document.getElementById('svc-grid');
     grid.innerHTML = '';
     d.data.forEach((svc, idx) => {
         const running = svc.running;
-        const isDev = svc.mode === 'development';
         const card = document.createElement('div');
-        card.className = 'svc-card ' + (running ? 'running' : 'stopped') + (isDev ? ' dev-mode' : '');
+        card.className = 'svc-card ' + (running ? 'running' : 'stopped');
         card.style.animationDelay = (idx * 0.08) + 's';
-        const modeBadge = isDev
-            ? '<span class="mode-badge dev">DEV</span>'
-            : '<span class="mode-badge prod">LIVE</span>';
+        const isDev = ACTIVE_TARGET === 'dev';
         const deployBtnClass = isDev ? 'btn btn-deploy-dev' : 'btn btn-deploy';
         const deployLabel = isDev ? 'DEPLOY DEV' : 'DEPLOY';
         const faviconUrl = svc.favicon || (svc.host && svc.host !== 'localhost' ? 'https://' + svc.host + '/favicon.ico' : '');
         const faviconImg = faviconUrl ? '<img class="svc-favicon" src="' + esc(faviconUrl) + '" alt="" onerror="this.style.display=\'none\'">' : '';
         const secretsBadge = (() => { const sec = svc.secrets; if (!sec || sec.required === 0) return ''; const ok = sec.present === sec.required; return '<span class="badge ' + (ok ? 'badge-ok' : 'badge-warn') + '">secrets: ' + sec.present + '/' + sec.required + '</span>'; })();
         card.innerHTML = `
-            <div class="svc-toprow">
-                ${modeBadge}
-                ${faviconImg}
-                <div class="svc-toprow-spacer"></div>
-                ${secretsBadge}
-                <div class="status-led ${running ? 'on' : 'off'}"></div>
+            <div class="svc-header">
+                <div class="svc-name">${faviconImg}<a href="/ui/service/${svc.name}">${svc.name}</a></div>
+                <div class="svc-header-right">${secretsBadge}<div class="status-led ${running ? 'on' : 'off'}"></div></div>
             </div>
-            <div class="svc-name"><a href="/ui/service/${svc.name}">${svc.name}</a></div>
             <dl class="svc-meta">
                 <dt>PORT</dt><dd>${svc.port || '\u2014'}</dd>
                 <dt>PID</dt><dd>${svc.pid || '\u2014'}</dd>
