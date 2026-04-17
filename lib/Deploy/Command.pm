@@ -28,10 +28,22 @@ sub resolve_service ($self, $input) {
 sub parse_target ($self, @args) {
     return (undef, 'dev') unless @args;
     if (@args == 1) {
+        # Is it a known target name? Check all services for matching target keys
+        if ($self->_is_target_name($args[0])) {
+            return (undef, $args[0]);
+        }
         return ($args[0], 'dev');
     }
     my ($svc_input, $target_input) = @args;
     return ($svc_input, $target_input);
+}
+
+sub _is_target_name ($self, $name) {
+    for my $svc_name (@{ $self->config->service_names }) {
+        my $raw = $self->config->service_raw($svc_name);
+        return 1 if exists $raw->{targets}{$name};
+    }
+    return 0;
 }
 
 sub transport_for ($self, $name, $target) {
