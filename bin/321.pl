@@ -934,9 +934,26 @@ body::after {
     border-color: var(--border-hi);
 }
 
-.svc-controls {
+.svc-actions-primary {
+    gap: 6px;
+}
+.svc-actions-primary .btn {
+    flex: 1;
+    justify-content: center;
+    font-size: 16px;
+    padding: 8px 10px;
+}
+.svc-actions-secondary {
     border-top: none;
     padding-top: 4px;
+}
+.btn-secondary {
+    font-size: 12px;
+    padding: 4px 8px;
+    opacity: 0.7;
+}
+.btn-secondary:hover {
+    opacity: 1;
 }
 
 .btn-ctrl {
@@ -2140,17 +2157,17 @@ async function loadServices() {
                 <dt>BRANCH</dt><dd>${svc.branch || '\u2014'}</dd>
                 <dt>RUNNER</dt><dd>${svc.runner || '\u2014'}</dd>
             </dl>
-            <div class="svc-actions">
+            <div class="svc-actions svc-actions-primary">
                 <a href="https://${svc.host || 'localhost'}" target="_blank" class="btn btn-tint btn-visit">VISIT</a>
-                ${svc.docs ? '<a href="' + svc.docs + '" target="_blank" class="btn btn-tint btn-docs">DOCS</a>' : ''}
-                ${svc.admin ? '<a href="' + svc.admin + '" target="_blank" class="btn btn-tint btn-admin">ADMIN</a>' : ''}
-                <a href="/ui/service/${svc.name}#logs" class="btn">LOGS</a>
-                <a href="/ui/service/${svc.name}" class="btn">CONFIG</a>
-            </div>
-            <div class="svc-actions svc-controls">
-                <button class="btn btn-ctrl" onclick="svcAction('${svc.name}','start')"><svg class="btn-icon" viewBox="0 0 16 16"><polygon points="4,2 4,14 14,8"/></svg> START</button>
                 <button class="btn btn-ctrl" onclick="svcAction('${svc.name}','restart')"><svg class="btn-icon" viewBox="0 0 16 16"><path d="M13,8A5,5 0 1,1 8,3" fill="none" stroke="currentColor" stroke-width="1.5"/><polygon points="8,0.5 8,5.5 11.5,3"/></svg> RESTART</button>
-                <button class="btn btn-ctrl btn-tint btn-stop" onclick="svcAction('${svc.name}','stop')"><svg class="btn-icon" viewBox="0 0 16 16"><rect x="3" y="3" width="10" height="10"/></svg> STOP</button>
+                <a href="/ui/service/${svc.name}#logs" class="btn">LOGS</a>
+            </div>
+            <div class="svc-actions svc-actions-secondary">
+                <button class="btn btn-ctrl btn-secondary" onclick="svcAction('${svc.name}','start')"><svg class="btn-icon" viewBox="0 0 16 16"><polygon points="4,2 4,14 14,8"/></svg> START</button>
+                <button class="btn btn-ctrl btn-secondary btn-tint btn-stop" onclick="svcAction('${svc.name}','stop')"><svg class="btn-icon" viewBox="0 0 16 16"><rect x="3" y="3" width="10" height="10"/></svg> STOP</button>
+                <a href="/ui/service/${svc.name}" class="btn btn-secondary">CONFIG</a>
+                ${svc.docs ? '<a href="' + svc.docs + '" target="_blank" class="btn btn-secondary btn-tint btn-docs">DOCS</a>' : ''}
+                ${svc.admin ? '<a href="' + svc.admin + '" target="_blank" class="btn btn-secondary btn-tint btn-admin">ADMIN</a>' : ''}
                 <button class="${deployBtnClass}" onclick="deployService('${svc.name}', this, ${isDev})" id="deploy-btn-${svc.name.replace(/\./g,'_')}">
                     <svg class="btn-icon" viewBox="0 0 16 16"><polygon points="4,2 4,14 14,8"/></svg> ${deployLabel}
                 </button>
