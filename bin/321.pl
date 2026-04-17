@@ -2988,7 +2988,7 @@ setInterval(loadStatus, 10000);
                 <div class="add-guide-title">After registering</div>
                 <ol class="add-steps">
                     <li>
-                        <strong>Add a manifest</strong> to your repo &mdash; create <code>.321.yml</code> at the root:
+                        <strong>Add a manifest</strong> to your repo &mdash; create <code>321.yml</code> at the root:
                         <pre class="add-code">name: pizza.web
 entry: bin/app.pl
 runner: hypnotoad</pre>
@@ -3009,7 +3009,7 @@ runner: hypnotoad</pre>
                     <li><strong>Ports</strong> &mdash; check the dashboard to see what&rsquo;s already in use.</li>
                     <li><strong>Naming</strong> &mdash; keep the group short and lowercase. It appears everywhere.</li>
                     <li><strong>Dev parity</strong> &mdash; dev gets the same nginx + SSL as live. Run <code>321 hosts</code> after install.</li>
-                    <li><strong>No bin/runner field?</strong> &mdash; those come from <code>.321.yml</code> in the service repo.</li>
+                    <li><strong>No bin/runner field?</strong> &mdash; those come from <code>321.yml</code> in the service repo.</li>
                 </ul>
             </div>
 

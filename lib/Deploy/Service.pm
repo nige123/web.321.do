@@ -4,7 +4,6 @@ use Mojo::Base -base, -signatures;
 use Mojo::IOLoop;
 use Path::Tiny qw(path);
 use POSIX qw(strftime);
-use Deploy::Secrets;
 use Deploy::Local;
 
 has 'config';     # Deploy::Config instance
@@ -47,22 +46,6 @@ sub all_status ($self) {
 sub deploy ($self, $name, %opts) {
     my $svc = $self->config->service($name);
     return { status => 'error', message => "Unknown service: $name" } unless $svc;
-
-    # Block deploy if required secrets are missing
-    if (keys %{ $svc->{env_required} // {} }) {
-        my $secrets = Deploy::Secrets->new(app_home => $self->config->app_home);
-        my $diff = $secrets->diff($name, {
-            required => $svc->{env_required},
-            optional => $svc->{env_optional} // {},
-        });
-        if (@{ $diff->{missing} }) {
-            my $pl = @{$diff->{missing}} > 1 ? 's' : '';
-            return {
-                status  => 'error',
-                message => "missing required secret$pl: " . join(', ', @{ $diff->{missing} }),
-            };
-        }
-    }
 
     my $skip_git = $opts{skip_git} // 0;
     my @steps;
