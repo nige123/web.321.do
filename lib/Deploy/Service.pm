@@ -30,8 +30,9 @@ sub status ($self, $name) {
         mode    => $svc->{mode} // 'production',
         runner  => $svc->{runner} // 'hypnotoad',
         host    => $svc->{host} // 'localhost',
-        ($svc->{docs}  ? (docs  => $svc->{docs})  : ()),
-        ($svc->{admin} ? (admin => $svc->{admin}) : ()),
+        ($svc->{favicon} ? (favicon => $svc->{favicon}) : ()),
+        ($svc->{docs}    ? (docs    => $svc->{docs})    : ()),
+        ($svc->{admin}   ? (admin   => $svc->{admin})   : ()),
     };
 }
 

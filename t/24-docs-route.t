@@ -11,6 +11,6 @@ $t->get_ok('/docs')
   ->content_type_like(qr{text/html})
   ->content_like(qr{<h1>.*How to use}s, 'renders top-level heading')
   ->content_like(qr{<code>.*321 install.*</code>}s, 'renders fenced code / inline code')
-  ->content_like(qr{<a href="/docs" class="mission-link">DOCS</a>}, 'DOCS link present in mission bar');
+  ->content_like(qr{<a href="/docs" class="mission-nav">DOCS</a>}, 'DOCS link present in mission bar');
 
 done_testing;

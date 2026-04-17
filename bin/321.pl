@@ -745,6 +745,18 @@ body::after {
     font-size: 19px;
     font-weight: 600;
     letter-spacing: 1px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.svc-favicon {
+    width: 18px;
+    height: 18px;
+    object-fit: contain;
+    flex-shrink: 0;
+    opacity: 0.85;
 }
 
 .svc-name a {
@@ -2085,9 +2097,11 @@ async function loadServices() {
             : '<span class="mode-badge prod">LIVE</span>';
         const deployBtnClass = isDev ? 'btn btn-deploy-dev' : 'btn btn-deploy';
         const deployLabel = isDev ? 'DEPLOY DEV' : 'DEPLOY';
+        const faviconUrl = svc.favicon || (svc.host && svc.host !== 'localhost' ? 'https://' + svc.host + '/favicon.ico' : '');
+        const faviconImg = faviconUrl ? '<img class="svc-favicon" src="' + esc(faviconUrl) + '" alt="" onerror="this.style.display=\'none\'">' : '';
         card.innerHTML = `
             <div class="svc-header">
-                <div class="svc-name"><a href="/ui/service/${svc.name}">${svc.name}</a>${modeBadge}${(() => { const sec = svc.secrets; if (!sec || sec.required === 0) return ''; const ok = sec.present === sec.required; return '<span class="badge ' + (ok ? 'badge-ok' : 'badge-warn') + '">secrets: ' + sec.present + '/' + sec.required + '</span>'; })()}</div>
+                <div class="svc-name">${faviconImg}<a href="/ui/service/${svc.name}">${svc.name}</a>${modeBadge}${(() => { const sec = svc.secrets; if (!sec || sec.required === 0) return ''; const ok = sec.present === sec.required; return '<span class="badge ' + (ok ? 'badge-ok' : 'badge-warn') + '">secrets: ' + sec.present + '/' + sec.required + '</span>'; })()}</div>
                 <div class="status-led ${running ? 'on' : 'off'}"></div>
             </div>
             <dl class="svc-meta">
