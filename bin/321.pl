@@ -1074,6 +1074,30 @@ body::after {
     animation: deploy-pulse 0.8s ease-in-out infinite;
 }
 
+/* ═══ DETAIL PAGE ACTIONS ═══ */
+
+.detail-actions-primary {
+    display: flex;
+    gap: 6px;
+    margin-top: 12px;
+}
+.detail-actions-primary .btn {
+    flex: 1;
+    justify-content: center;
+    font-size: 14px;
+    padding: 8px 10px;
+}
+.detail-actions-secondary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 6px;
+}
+.detail-actions-secondary .btn {
+    flex: 1;
+    justify-content: center;
+}
+
 /* ═══ DEPLOY OUTPUT ═══ */
 
 .deploy-output {
@@ -2256,19 +2280,25 @@ setInterval(loadServices, 30000);
                 <dt>BRANCH</dt><dd id="m-branch">&mdash;</dd>
                 <dt>REPO</dt><dd id="m-repo">&mdash;</dd>
             </dl>
-            <button class="btn btn-deploy" id="deploy-btn" onclick="deploy()" style="width:100%;justify-content:center">
-                <svg class="btn-icon" viewBox="0 0 16 16"><polygon points="4,2 4,14 14,8"/></svg> DEPLOY
-            </button>
-            <div class="lifecycle-row">
-                <button class="btn btn-tint btn-docs"  id="update-btn"  onclick="lifecycle('update')"  title="git pull + cpanm + migrate, no restart"><svg class="btn-icon" viewBox="0 0 16 16"><path d="M8,2 L8,11 M4,7 L8,11 L12,7" fill="none" stroke="currentColor" stroke-width="1.5"/></svg> UPDATE</button>
-                <button class="btn btn-tint btn-admin" id="migrate-btn" onclick="lifecycle('migrate')" title="Run bin/migrate only"><svg class="btn-icon" viewBox="0 0 16 16"><path d="M3,5 L8,5 M3,8 L13,8 M3,11 L10,11" fill="none" stroke="currentColor" stroke-width="1.5"/></svg> MIGRATE</button>
-                <button class="btn btn-tint btn-stop"  id="restart-btn" onclick="lifecycle('restart')" title="ubic restart + port check"><svg class="btn-icon" viewBox="0 0 16 16"><path d="M13,8A5,5 0 1,1 8,3" fill="none" stroke="currentColor" stroke-width="1.5"/><polygon points="8,0.5 8,5.5 11.5,3"/></svg> RESTART</button>
+            <div class="detail-actions-primary">
+                <a id="visit-btn" href="#" target="_blank" rel="noopener"
+                   class="btn btn-tint btn-visit" style="display:none">
+                    VISIT &rarr;
+                </a>
+                <button class="btn btn-ctrl" id="restart-btn" onclick="lifecycle('restart')" title="ubic restart + port check">
+                    <svg class="btn-icon" viewBox="0 0 16 16"><path d="M13,8A5,5 0 1,1 8,3" fill="none" stroke="currentColor" stroke-width="1.5"/><polygon points="8,0.5 8,5.5 11.5,3"/></svg> RESTART
+                </button>
+                <a href="#logs" class="btn" onclick="document.querySelector('.log-viewer').scrollIntoView({behavior:'smooth'});return false;">LOGS</a>
             </div>
-            <a id="visit-btn" href="#" target="_blank" rel="noopener"
-               class="btn btn-tint btn-visit"
-               style="width:100%;justify-content:center;margin-top:8px;display:none">
-                VISIT &rarr;
-            </a>
+            <div class="detail-actions-secondary">
+                <button class="btn btn-secondary btn-ctrl" onclick="svcAction('start')"><svg class="btn-icon" viewBox="0 0 16 16"><polygon points="4,2 4,14 14,8"/></svg> START</button>
+                <button class="btn btn-secondary btn-ctrl btn-tint btn-stop" onclick="svcAction('stop')"><svg class="btn-icon" viewBox="0 0 16 16"><rect x="3" y="3" width="10" height="10"/></svg> STOP</button>
+                <button class="btn btn-secondary btn-tint btn-docs"  id="update-btn"  onclick="lifecycle('update')"  title="git pull + cpanm + migrate, no restart">UPDATE</button>
+                <button class="btn btn-secondary btn-tint btn-admin" id="migrate-btn" onclick="lifecycle('migrate')" title="Run bin/migrate only">MIGRATE</button>
+                <button class="btn btn-deploy btn-secondary" id="deploy-btn" onclick="deploy()" style="width:100%;justify-content:center;margin-top:6px">
+                    <svg class="btn-icon" viewBox="0 0 16 16"><polygon points="4,2 4,14 14,8"/></svg> DEPLOY
+                </button>
+            </div>
             <div class="secrets-panel" id="secrets-panel" style="display:none">
                 <div class="section-title" style="margin-top:16px">SECRETS</div>
                 <div id="secrets-content"></div>
@@ -2317,6 +2347,20 @@ setInterval(loadServices, 30000);
 <script>
 const SVC = '<%= $service_name %>';
 let currentLogType = null;
+
+async function svcAction(action) {
+    try {
+        const d = await api('/service/' + SVC + '/' + action, { method: 'POST' });
+        if (d.status === 'success') {
+            toast(SVC + ' ' + action + ' OK');
+        } else {
+            toast(d.message || action + ' failed', 'error');
+        }
+    } catch(e) {
+        toast(action + ' error: ' + e.message, 'error');
+    }
+    loadStatus();
+}
 
 async function loadStatus() {
     const d = await api('/service/' + SVC + '/status');
