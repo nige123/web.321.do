@@ -26,16 +26,32 @@ sub resolve_service ($self, $input) {
 }
 
 sub parse_target ($self, @args) {
-    return (undef, 'dev') unless @args;
+    if (!@args) {
+        # No args — try to infer service from cwd
+        my $svc = $self->_infer_service;
+        return ($svc, 'dev') if $svc;
+        return (undef, 'dev');
+    }
     if (@args == 1) {
-        # Is it a known target name? Check all services for matching target keys
+        # Is it a known target name? If so, infer service from cwd
         if ($self->_is_target_name($args[0])) {
+            my $svc = $self->_infer_service;
+            return ($svc, $args[0]) if $svc;
             return (undef, $args[0]);
         }
         return ($args[0], 'dev');
     }
     my ($svc_input, $target_input) = @args;
     return ($svc_input, $target_input);
+}
+
+sub _infer_service ($self) {
+    my $manifest_file = Mojo::File->new('321.yml');
+    return undef unless -f $manifest_file;
+    require YAML::XS;
+    my $raw = YAML::XS::LoadFile($manifest_file->to_string);
+    return $raw->{name} if ref $raw eq 'HASH' && $raw->{name};
+    return undef;
 }
 
 sub _is_target_name ($self, $name) {
