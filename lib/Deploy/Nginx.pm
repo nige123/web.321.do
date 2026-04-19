@@ -28,7 +28,13 @@ sub generate ($self, $name) {
 
     my $provider = $self->cert_provider->pick($self->config->target);
     my $paths    = $self->cert_provider->cert_paths(provider => $provider, host => $host);
-    my $has_ssl  = -f $paths->{cert};
+    my $has_ssl;
+    if ($self->transport) {
+        my $check = $self->transport->run("test -f $paths->{cert}");
+        $has_ssl = $check->{ok};
+    } else {
+        $has_ssl = -f $paths->{cert};
+    }
 
     my $conf = $self->_render_config($host, $port, $has_ssl, $paths);
 

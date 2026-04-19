@@ -117,6 +117,7 @@ sub run ($self, @args) {
     # Step 9: Nginx
     if ($host ne 'localhost' && $port) {
         say "  Setting up nginx for $host -> :$port...";
+        $self->nginx->transport($transport);
         my $nginx_result = $self->nginx->setup($name);
         for my $step (@{ $nginx_result->{steps} // [] }) {
             my $s = ref $step->{success} ? ${$step->{success}} : $step->{success};
