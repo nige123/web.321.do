@@ -58,7 +58,7 @@ sub run ($self, @args) {
 
     # Step 4: Clone repo
     say "  Checking repo $repo...";
-    my $r = $transport->run("test -d $repo && echo EXISTS");
+    my $r = $transport->run("test -d $repo/.git && echo EXISTS");
     if ($r->{output} =~ /EXISTS/) {
         say "  [OK] Repo already exists";
     } else {
