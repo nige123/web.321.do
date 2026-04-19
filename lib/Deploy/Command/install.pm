@@ -1,6 +1,7 @@
 package Deploy::Command::install;
 
 use Mojo::Base 'Deploy::Command', -signatures;
+use Deploy::Local;
 
 has description => 'First-time install: clone, perlbrew, deps, ubic, nginx, ssl';
 has usage => sub ($self) { $self->extract_usage };
@@ -69,11 +70,11 @@ sub run ($self, @args) {
         say "  [OK] Cloned $git_url";
     }
 
-    # Check manifest — scaffold if missing
-    $r = $transport->run("test -f $repo/321.yml && echo FOUND");
-    unless ($r->{output} =~ /FOUND/) {
-        say "  No 321.yml found - creating boilerplate...";
-        $self->_scaffold_manifest($repo, $name, $transport);
+    # Check manifest locally — 321.yml lives in the service repo on this machine
+    unless (-f "$repo/321.yml") {
+        say "  No 321.yml found in $repo - creating boilerplate...";
+        require Path::Tiny;
+        $self->_scaffold_manifest($repo, $name, Deploy::Local->new);
         say "  [OK] Created $repo/321.yml - edit it to match your app, then re-run install";
         say "";
         say "  vim $repo/321.yml";
