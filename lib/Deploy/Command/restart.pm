@@ -18,7 +18,15 @@ sub run ($self, @args) {
         my $ok = $svc_mgr->_ok($step);
         printf "  [%s] %s\n", ($ok ? 'OK' : 'FAIL'), $step->{step};
     }
-    say "  $r->{message}" if $r->{message};
+    if ($r->{status} eq 'success') {
+        my $svc  = $self->config->service($name);
+        my $port = $svc->{port} // '?';
+        my $host = $svc->{host} // 'localhost';
+        my $url  = $host ne 'localhost' ? "https://$host/" : "http://localhost:$port/";
+        say "  $r->{message}  port:$port  $url";
+    } else {
+        say "  $r->{message}" if $r->{message};
+    }
 }
 
 1;

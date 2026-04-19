@@ -12,7 +12,11 @@ sub run ($self, @args) {
     my $transport = $self->transport_for($name, $target);
     my $r = $transport->run("ubic start $name");
     if ($r->{ok}) {
-        say "  $name started ($target)";
+        my $svc  = $self->config->service($name);
+        my $port = $svc->{port} // '?';
+        my $host = $svc->{host} // 'localhost';
+        my $url  = $host ne 'localhost' ? "https://$host/" : "http://localhost:$port/";
+        say "  $name started ($target)  port:$port  $url";
     } else {
         say "  $name start failed: $r->{output}";
     }
