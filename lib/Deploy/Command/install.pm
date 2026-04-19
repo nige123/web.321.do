@@ -131,7 +131,7 @@ sub run ($self, @args) {
         say "  [STOP] Created $repo/321.yml";
         say "";
         say "  Next: edit the manifest, then re-run:";
-        say "    vim $repo/321.yml";
+        say "    nano $repo/321.yml";
         say "    321 install $name $target";
         return;
     }
