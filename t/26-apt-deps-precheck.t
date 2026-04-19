@@ -37,15 +37,12 @@ subtest 'declared & installed → pass' => sub {
     like $out, qr/coreutils/,       'lists the package';
 };
 
-subtest 'declared but missing → fail with apt install command' => sub {
+subtest 'declared but missing → auto-install fails for bogus package' => sub {
     my $bogus = 'nonexistent-package-xyz-' . time;
     my $svc = { apt_deps => ['coreutils', $bogus] };
     my ($ok, $out) = $svc_mgr->_check_apt_deps($svc);
-    ok !$ok,                       'check fails';
+    ok !$ok,                       'check fails when install fails';
     like $out, qr/\Q$bogus\E/,     'names the missing package';
-    like $out, qr/sudo apt install -y/, 'shows apt install command';
-    like $out, qr/\Q$bogus\E/,     'missing package appears in the command';
-    unlike $out, qr/\bcoreutils\b(?!\S).*sudo/s, 'installed package not in the install command';
 };
 
 done_testing;

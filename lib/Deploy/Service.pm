@@ -231,8 +231,13 @@ sub _check_apt_deps ($self, $svc) {
 
     return (1, 'all installed: ' . join(' ', @$deps)) unless @missing;
 
-    my $cmd = 'sudo apt install -y ' . join(' ', @missing);
-    return (0, "Missing system packages: " . join(', ', @missing) . "\n\nRun:\n  $cmd");
+    # Auto-install missing packages
+    my $cmd = 'sudo apt-get install -y ' . join(' ', @missing);
+    $self->log->info("Installing missing apt deps: " . join(', ', @missing));
+    my $r = $self->transport->run($cmd, timeout => 300);
+    return $r->{ok}
+        ? (1, 'installed: ' . join(' ', @missing))
+        : (0, "Failed to install: " . join(', ', @missing) . "\n$r->{output}");
 }
 
 sub _cpanm_cmd ($self, $perlbrew) {
