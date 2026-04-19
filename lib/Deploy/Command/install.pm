@@ -141,39 +141,57 @@ sub run ($self, @args) {
 
 sub _scaffold_manifest ($self, $repo, $name, $transport) {
     my $manifest = <<"YAML";
-# 321.yml — service manifest for $name
+# 321.yml - service manifest for $name
 #
 # This file tells 321 how to run your app.
 # Edit the values below, then re-run: 321 install $name
 
-# Service identity (must match services/*.yml)
+# Service identity
 name: $name
 
-# Entry point — the script 321 starts via hypnotoad/morbo
+# Entry point - the script 321 starts via hypnotoad/morbo
 entry: bin/app.pl
 
-# Process runner: hypnotoad (production, zero-downtime) or morbo (dev, auto-reload)
+# Default process runner: hypnotoad (production) or morbo (dev, auto-reload)
 runner: hypnotoad
 
 # Perl version managed by perlbrew (omit if using system perl)
 # perl: perl-5.42.0
 
-# Health check path — 321 hits this after deploy to verify the app is up
+# Health check path - 321 hits this after deploy to verify the app is up
 # health: /health
 
-# Environment variables the app requires to start.
-# Deploy is blocked if any of these are missing from secrets/<name>.env
+# Git branch to deploy from
+# branch: main
+
+# === Targets ===
+# Each target defines where and how the service runs.
+# 'dev' runs locally, 'live' runs on a remote server via SSH.
+
+dev:
+    host: $name.dev
+    port: 8080
+    runner: morbo
+
+# live:
+#     ssh: ubuntu\@your-ec2-host.compute.amazonaws.com
+#     ssh_key: ~/.ssh/your-key.pem
+#     host: your-domain.com
+#     port: 8080
+#     runner: hypnotoad
+
+# === Environment Variables ===
+
+# Variables the app requires to start (deploy blocked if missing)
 # env_required:
 #   DATABASE_URL: "Postgres connection string"
 #   SECRET_KEY: "Session signing key"
 
-# Environment variables with sensible defaults — optional to set
+# Variables with sensible defaults (optional to set)
 # env_optional:
 #   LOG_LEVEL:
 #     default: info
 #     desc: "debug | info | warn | error"
-#   MOJO_MODE:
-#     default: production
 YAML
 
     require Path::Tiny;
