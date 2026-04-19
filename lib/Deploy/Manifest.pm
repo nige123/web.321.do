@@ -8,7 +8,7 @@ my %VALID_RUNNER = map { $_ => 1 } qw(hypnotoad morbo script);
 my $ENV_KEY_RE   = qr/^[A-Z_][A-Z0-9_]*$/;
 
 my %IDENTITY_KEY = map { $_ => 1 } qw(
-    name entry runner perl health branch
+    name entry runner perl health branch repo
     env_required env_optional apt_deps favicon
 );
 
@@ -52,6 +52,7 @@ sub load ($class, $repo_dir) {
         apt_deps     => $raw->{apt_deps} // [],
         targets      => \%targets,
         repo         => "$repo_dir",
+        ($raw->{repo}    ? (git_url => $raw->{repo})    : ()),
         ($raw->{favicon} ? (favicon => $raw->{favicon}) : ()),
     };
 }

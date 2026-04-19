@@ -63,8 +63,9 @@ sub run ($self, @args) {
         say "  [OK] Repo already exists";
     } else {
         say "  Cloning repo...";
-        my $git_url = $self->_guess_git_url($repo);
-        die "  No repo at $repo and cannot guess git URL\n" unless $git_url;
+        my $manifest = $self->config->service_raw($name);
+        my $git_url = $manifest->{git_url} // $self->_guess_git_url($repo);
+        die "  No repo at $repo and no git URL configured.\n  Add 'repo: git\@github.com:user/repo.git' to 321.yml\n" unless $git_url;
         $r = $transport->run("git clone -b $branch $git_url $repo", timeout => 120);
         die "  Clone failed: $r->{output}\n" unless $r->{ok};
         say "  [OK] Cloned $git_url";
@@ -150,6 +151,9 @@ sub _scaffold_manifest ($self, $repo, $name, $transport) {
 
 # Service identity
 name: $name
+
+# Git clone URL (used by 321 install to clone on remote servers)
+# repo: git\@github.com:user/$name.git
 
 # Entry point - the script 321 starts via hypnotoad/morbo
 entry: bin/app.pl
