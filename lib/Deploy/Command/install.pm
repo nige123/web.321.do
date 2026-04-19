@@ -21,122 +21,226 @@ sub run ($self, @args) {
     my $perlbrew = $svc->{perlbrew};
     my $host     = $svc->{host} // 'localhost';
     my $port     = $svc->{port};
+    my $is_remote = $svc->{ssh} ? 1 : 0;
+    my $ssh_target = $svc->{ssh} // 'localhost';
 
     say "3... 2... 1... installing $name ($target)";
     say "";
 
-    # Step 1: Check/install perlbrew
+    # --- Perlbrew ---
     if ($perlbrew) {
         say "  Checking perlbrew...";
         my $r = $transport->run('which perlbrew 2>/dev/null || echo MISSING');
         if ($r->{output} =~ /MISSING/) {
             say "  Installing perlbrew...";
             $r = $transport->run('curl -L https://install.perlbrew.pl | bash && echo "source ~/perl5/perlbrew/etc/bashrc" >> ~/.bashrc', timeout => 120);
-            die "  perlbrew install failed: $r->{output}\n" unless $r->{ok};
-            say "  [OK] perlbrew installed";
-        } else {
-            say "  [OK] perlbrew already installed";
+            unless ($r->{ok}) {
+                say "  [FAIL] perlbrew install failed";
+                say "";
+                say "  Next: SSH in and install perlbrew manually:";
+                say "    ssh $ssh_target";
+                say "    curl -L https://install.perlbrew.pl | bash";
+                say "  Then re-run: 321 install $name $target";
+                return;
+            }
         }
+        # Verify perlbrew works
+        $r = $transport->run('perlbrew version');
+        unless ($r->{ok}) {
+            say "  [FAIL] perlbrew not working";
+            say "";
+            say "  Next: check perlbrew installation on $ssh_target";
+            return;
+        }
+        say "  [OK] perlbrew";
 
-        # Step 2: Check/install perl version
+        # --- Perl version ---
         say "  Checking $perlbrew...";
         $r = $transport->run("perlbrew list | grep -q '$perlbrew'");
         unless ($r->{ok}) {
             say "  Installing $perlbrew (this takes 10-20 minutes)...";
             $r = $transport->run("perlbrew install $perlbrew --notest -j4", timeout => 1800);
-            die "  $perlbrew install failed: $r->{output}\n" unless $r->{ok};
-            say "  [OK] $perlbrew installed";
-        } else {
-            say "  [OK] $perlbrew available";
         }
+        # Verify perl version available
+        $r = $transport->run("perlbrew list | grep -q '$perlbrew'");
+        unless ($r->{ok}) {
+            say "  [FAIL] $perlbrew not available after install";
+            say "";
+            say "  Next: SSH in and install manually:";
+            say "    ssh $ssh_target";
+            say "    perlbrew install $perlbrew --notest -j4";
+            say "  Then re-run: 321 install $name $target";
+            return;
+        }
+        say "  [OK] $perlbrew";
 
-        # Step 3: Install cpanm
+        # --- cpanm ---
         say "  Checking cpanm...";
-        $r = $transport->run('perlbrew install-cpanm 2>&1');
-        say "  [OK] cpanm ready";
+        $transport->run('perlbrew install-cpanm 2>&1');
+        $r = $transport->run('which cpanm 2>/dev/null');
+        unless ($r->{ok}) {
+            say "  [FAIL] cpanm not available";
+            say "";
+            say "  Next: ssh $ssh_target && perlbrew install-cpanm";
+            say "  Then re-run: 321 install $name $target";
+            return;
+        }
+        say "  [OK] cpanm";
     }
 
-    # Step 4: Clone repo
+    # --- Clone repo ---
     say "  Checking repo $repo...";
     my $r = $transport->run("test -d $repo/.git && echo EXISTS");
-    if ($r->{output} =~ /EXISTS/) {
-        say "  [OK] Repo already exists";
-    } else {
+    unless ($r->{output} =~ /EXISTS/) {
         say "  Cloning repo...";
         my $manifest = $self->config->service_raw($name);
         my $git_url = $manifest->{git_url} // $self->_guess_git_url($repo);
-        die "  No repo at $repo and no git URL configured.\n  Add 'repo: git\@github.com:user/repo.git' to 321.yml\n" unless $git_url;
-        # Remove empty/stale directory if it exists without .git
+        unless ($git_url) {
+            say "  [FAIL] No git URL configured";
+            say "";
+            say "  Next: add to $repo/321.yml:";
+            say "    repo: git\@github.com:user/repo.git";
+            say "  Then re-run: 321 install $name $target";
+            return;
+        }
         $transport->run("test -d $repo && rm -rf $repo");
         $r = $transport->run("git clone -b $branch $git_url $repo", timeout => 120);
-        die "  Clone failed: $r->{output}\n" unless $r->{ok};
-        say "  [OK] Cloned $git_url";
+        unless ($r->{ok}) {
+            say "  [FAIL] Clone failed";
+            say "  $r->{output}" if $r->{output};
+            say "";
+            say "  Next: check git SSH access on $ssh_target:";
+            say "    ssh $ssh_target";
+            say "    ssh -T git\@github.com";
+            say "  Then re-run: 321 install $name $target";
+            return;
+        }
     }
-
-    # Check manifest locally — 321.yml lives in the service repo on this machine
-    unless (-f "$repo/321.yml") {
-        say "  No 321.yml found in $repo - creating boilerplate...";
-        require Path::Tiny;
-        $self->_scaffold_manifest($repo, $name, Deploy::Local->new);
-        say "  [OK] Created $repo/321.yml - edit it to match your app, then re-run install";
-        say "";
-        say "  vim $repo/321.yml";
+    # Verify repo exists
+    $r = $transport->run("test -d $repo/.git && echo OK");
+    unless ($r->{output} =~ /OK/) {
+        say "  [FAIL] Repo not found at $repo";
         return;
     }
-    say "  [OK] Manifest found";
+    say "  [OK] repo";
 
-    # Step 5: Install deps
+    # --- Manifest ---
+    unless (-f "$repo/321.yml") {
+        say "  No 321.yml found - creating boilerplate...";
+        $self->_scaffold_manifest($repo, $name, Deploy::Local->new);
+        say "  [STOP] Created $repo/321.yml";
+        say "";
+        say "  Next: edit the manifest, then re-run:";
+        say "    vim $repo/321.yml";
+        say "    321 install $name $target";
+        return;
+    }
+    say "  [OK] manifest";
+
+    # --- Dependencies ---
     say "  Installing dependencies...";
     $r = $transport->run_in_dir($repo, 'cpanm -L local --notest --installdeps .', timeout => 600);
-    say $r->{ok} ? "  [OK] Dependencies installed" : "  [WARN] cpanm had errors (continuing)";
+    # Verify local/ was created
+    my $check = $transport->run("test -d $repo/local && echo OK");
+    if ($check->{output} =~ /OK/) {
+        say "  [OK] deps";
+    } else {
+        say "  [WARN] cpanm may have had errors (continuing)";
+    }
 
-    # Step 6: Bootstrap ubic (first time)
+    # --- Ubic ---
     $r = $transport->run('test -f ~/.ubic.cfg && echo EXISTS');
     unless ($r->{output} =~ /EXISTS/) {
         say "  Bootstrapping ubic...";
         $transport->run('cpanm --notest Ubic Ubic::Service::SimpleDaemon', timeout => 300);
         $r = $transport->run('ubic-admin setup --batch-mode --local');
-        die "  ubic-admin setup failed: $r->{output}\n" unless $r->{ok};
-        say "  [OK] Ubic bootstrapped";
-    } else {
-        say "  [OK] Ubic already set up";
     }
+    # Verify ubic works
+    $r = $transport->run('ubic status 2>&1 | head -1');
+    unless ($r->{ok}) {
+        say "  [FAIL] ubic not working";
+        say "";
+        say "  Next: SSH in and bootstrap ubic:";
+        say "    ssh $ssh_target";
+        say "    cpanm --notest Ubic Ubic::Service::SimpleDaemon";
+        say "    ubic-admin setup --batch-mode --local";
+        say "  Then re-run: 321 install $name $target";
+        return;
+    }
+    say "  [OK] ubic";
 
-    # Step 7: Generate ubic service file
+    # --- Generate ubic service file ---
     say "  Generating ubic service...";
     my $gen = $self->ubic->generate($name);
-    if ($svc->{ssh}) {
+    if ($is_remote) {
         $transport->run("mkdir -p \$(dirname $gen->{path})");
         $transport->upload($gen->{path}, $gen->{path});
+        # Install symlink on remote
+        my ($group, $svc_name) = split /\./, $name, 2;
+        $transport->run("mkdir -p ~/ubic/service/$group");
+        $transport->run("ln -sf $gen->{path} ~/ubic/service/$group/$svc_name");
+    } else {
+        $self->ubic->install_symlinks;
     }
-    $self->ubic->install_symlinks;
-    say "  [OK] Ubic service ready";
+    say "  [OK] ubic service";
 
-    # Step 8: Start service
-    say "  Starting service...";
+    # --- Start service ---
+    say "  Starting $name...";
     $r = $transport->run("ubic start $name 2>&1");
-    say "  [OK] Service started";
+    # Verify it's running
+    sleep 2;
+    $r = $transport->run("ubic status $name 2>&1");
+    if ($r->{output} =~ /running/) {
+        say "  [OK] running";
+    } else {
+        say "  [FAIL] service not running after start";
+        say "  $r->{output}" if $r->{output};
+        say "";
+        say "  Next: check logs:";
+        say "    321 logs $name $target --stderr";
+        say "  Then re-run: 321 install $name $target";
+        return;
+    }
 
-    # Step 9: Nginx
+    # --- Nginx ---
     if ($host ne 'localhost' && $port) {
         say "  Setting up nginx for $host -> :$port...";
         $self->nginx->transport($transport);
         my $nginx_result = $self->nginx->setup($name);
+        # Verify nginx is OK
+        my $nginx_ok = 1;
         for my $step (@{ $nginx_result->{steps} // [] }) {
             my $s = ref $step->{success} ? ${$step->{success}} : $step->{success};
-            printf "  [%s] %s\n", ($s ? 'OK' : 'WARN'), $step->{step};
+            unless ($s) {
+                say "  [FAIL] nginx $step->{step}";
+                $nginx_ok = 0;
+                last;
+            }
+        }
+        if ($nginx_ok) {
+            say "  [OK] nginx";
+        } else {
+            say "";
+            say "  Next: check nginx config:";
+            say "    ssh $ssh_target";
+            say "    sudo nginx -t";
+            say "  Then re-run: 321 install $name $target";
+            return;
         }
 
-        # Step 10: SSL cert
+        # --- SSL ---
         my $provider = $self->nginx->cert_provider->pick($target);
         say "  Requesting SSL certificate via $provider...";
         my $cert = $self->nginx->acquire_cert($name);
         if ($cert->{status} eq 'ok') {
-            say "  [OK] SSL cert ready ($provider)";
+            say "  [OK] ssl ($provider)";
             $self->nginx->generate($name);
             $self->nginx->reload;
         } else {
-            warn "  [WARN] $provider failed - run manually later\n";
+            say "  [SKIP] $provider failed - DNS may not be pointed yet";
+            say "";
+            say "  Next: point DNS for $host to the server, then:";
+            say "    321 install $name $target";
         }
     }
 
