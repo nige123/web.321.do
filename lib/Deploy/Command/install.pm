@@ -66,6 +66,8 @@ sub run ($self, @args) {
         my $manifest = $self->config->service_raw($name);
         my $git_url = $manifest->{git_url} // $self->_guess_git_url($repo);
         die "  No repo at $repo and no git URL configured.\n  Add 'repo: git\@github.com:user/repo.git' to 321.yml\n" unless $git_url;
+        # Remove empty/stale directory if it exists without .git
+        $transport->run("test -d $repo && rm -rf $repo");
         $r = $transport->run("git clone -b $branch $git_url $repo", timeout => 120);
         die "  Clone failed: $r->{output}\n" unless $r->{ok};
         say "  [OK] Cloned $git_url";
