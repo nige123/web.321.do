@@ -1,20 +1,39 @@
-name: 321.web
-entry: bin/321.pl
-runner: hypnotoad
-perl: perl-5.42.0
-health: /health
-branch: master
+# 321.yml — service manifest for 321.do
+# Declares what this service is and how to run it.
+# 321 reads this to generate ubic configs, nginx sites, and deploy pipelines.
 
+# Service identity (required)
+name: 321.web                  # group.service — drives ubic tree, nginx, repo naming
+entry: bin/321.pl              # entry point script (relative to repo root)
+runner: hypnotoad              # hypnotoad | morbo | script
+
+# Runtime (optional)
+perl: perl-5.42.0              # perlbrew version
+health: /health                # health check path (GET, must return 200)
+branch: master                 # git branch to deploy from
+
+# Favicon shown on the 321 dashboard (optional)
+# favicon: https://321.do/favicon.ico
+
+# System packages needed before cpanm (optional)
+# apt_deps:
+#   - libexpat1-dev
+#   - libpng-dev
+
+# Per-target config — each key becomes a deployable target
 dev:
-    host: 321.do.dev
+    host: 321.do.dev           # hostname for nginx + SSL (mkcert on dev)
     port: 9321
-    runner: morbo
+    runner: morbo              # override runner for dev
 
 live:
     host: 321.do
     port: 9321
     runner: hypnotoad
+    # ssh: deploy@321.do      # remote host for live deploys (optional)
+    # ssh_key: ~/.ssh/id_ed25519
 
+# Environment variables the app needs
 env_required:
     MOJO_MODE: "production or development"
 
