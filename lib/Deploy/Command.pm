@@ -20,9 +20,16 @@ sub resolve_service ($self, $input) {
     @m = grep { index(lc $_, lc $input) >= 0 } @names;
     return $m[0] if @m == 1;
 
-    die @m > 1
-        ? "Ambiguous: '$input' matches: " . join(', ', @m) . "\n"
-        : "Unknown service: $input\nServices: " . join(', ', @names) . "\n";
+    if (@m > 1) {
+        die "Ambiguous: '$input' matches: " . join(', ', @m) . "\n";
+    }
+
+    # Not found — suggest creating a 321.yml
+    my $msg = "Unknown service: $input\n";
+    $msg .= "Known services: " . join(', ', @names) . "\n" if @names;
+    $msg .= "\nTo register a new service, create a 321.yml in its repo:\n";
+    $msg .= "  cd /home/s3/<repo> && 321 install $input\n";
+    die $msg;
 }
 
 sub parse_target ($self, @args) {
