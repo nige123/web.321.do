@@ -111,9 +111,17 @@ sub _build_bin_cmd ($self, $svc) {
     # Point the runtime at the repo's own local::lib tree (populated by
     # `cpanm -L local/ --installdeps .` during deploy).
     $all_env{PERL5LIB} = "$repo/local/lib/perl5";
-    # Prepend repo local/bin but keep perlbrew + system paths via $PATH
-    # perlbrew exec sets up the perl bin dir; we must not clobber it
-    $all_env{PATH}     = "$repo/local/bin:\$PATH";
+
+    # Build PATH explicitly: repo local/bin + perlbrew perl bin + system
+    my $perlbrew_root = $ENV{PERLBREW_ROOT} // "$ENV{HOME}/perl5/perlbrew";
+    $all_env{PATH} = join(':',
+        "$repo/local/bin",
+        "$perlbrew_root/perls/$perlbrew/bin",
+        "$perlbrew_root/bin",
+        '/usr/local/bin',
+        '/usr/bin',
+        '/bin',
+    );
 
     my $env_str = '';
     if (%all_env) {
