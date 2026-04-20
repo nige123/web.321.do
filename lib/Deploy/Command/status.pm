@@ -25,7 +25,11 @@ sub run ($self, @args) {
         my $host = $svc->{host} // 'localhost';
         my $url  = $host ne 'localhost' ? "https://$host/" : "http://localhost:$port/";
 
-        printf "%-15s  %-12s  port:%-5s  %s\n", $name, $ubic_status, $port, $url;
+        my $running = $ubic_status =~ /running/;
+        my $color_status = $running
+            ? "\e[32m$ubic_status\e[0m"    # green
+            : "\e[31m$ubic_status\e[0m";   # red
+        printf "%-15s  %-20s  port:%-5s  %s\n", $name, $color_status, $port, $url;
     }
 }
 
