@@ -3,7 +3,7 @@ package Deploy::Command::rebuild;
 use Mojo::Base 'Deploy::Command', -signatures;
 use Deploy::Hosts;
 
-has description => 'Regenerate all ubic service files + symlinks';
+has description => 'Regenerate all ubic service files';
 has usage => sub ($self) { $self->extract_usage };
 
 sub run ($self, @args) {
@@ -13,7 +13,6 @@ sub run ($self, @args) {
 
     my $ubic = $self->ubic;
     $ubic->generate_all;
-    $ubic->install_symlinks;
 
     say "Done.";
 

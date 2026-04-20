@@ -23,13 +23,12 @@ YAML
 
 my $cfg = Deploy::Config->new(app_home => "$home_obj", scan_dir => "$scan_obj", target => 'live');
 
-# Render into a tempdir — we only want the file contents to inspect
-path($repo, 'ubic', 'service', 'demo')->mkpath;
+# Generate writes to ~/ubic/service/<group>/<name>
 my $u = Deploy::Ubic->new(config => $cfg);
-$u->generate('demo.web');
+my $gen = $u->generate('demo.web');
 
 my $repo_str = "$repo";
-my $content = path($repo, 'ubic', 'service', 'demo', 'web')->slurp_utf8;
+my $content = path($gen->{path})->slurp_utf8;
 
 like $content, qr{PERL5LIB=\\'\Q$repo_str\E/local/lib/perl5\\'},
     'PERL5LIB points at repo-local lib';
