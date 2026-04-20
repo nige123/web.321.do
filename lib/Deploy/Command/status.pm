@@ -7,6 +7,7 @@ has usage => sub ($self) { $self->extract_usage };
 
 sub run ($self, @args) {
     my ($svc_input, $target) = $self->parse_target(@args);
+    $self->config->target($target);
 
     my @names = $svc_input
         ? ($self->resolve_service($svc_input))
