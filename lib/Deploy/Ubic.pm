@@ -3,8 +3,11 @@ package Deploy::Ubic;
 use Mojo::Base -base, -signatures;
 use Path::Tiny qw(path);
 
-has 'config';  # Deploy::Config instance
-has 'log';     # Mojo::Log instance (optional)
+has 'config';        # Deploy::Config instance
+has 'log';           # Mojo::Log instance (optional)
+has 'transport';     # Deploy::Local or Deploy::SSH — for remote queries
+has 'remote_home';   # override $HOME for remote targets
+has 'perlbrew_root'; # override $PERLBREW_ROOT for remote targets
 
 sub generate_all ($self) {
     my @results;
@@ -19,19 +22,44 @@ sub generate ($self, $name) {
     return { name => $name, status => 'error', message => "Unknown service: $name" } unless $svc;
 
     my $content = $self->_render_service_file($name, $svc);
+    my $home    = $self->_home;
     my $file    = $self->_ubic_file_path($name);
 
+    # Write locally first (may be uploaded to remote by caller)
     $file->parent->mkpath;
     $file->spew_utf8($content);
-    $file->chmod(0600);  # contains env setup, restrict access
+    $file->chmod(0600);
 
     $self->log->info("Generated ubic service file: $file") if $self->log;
     return { name => $name, status => 'ok', path => "$file" };
 }
 
-# No more symlinks needed — we write directly to ~/ubic/service/
 sub install_symlinks ($self) {
     return [];
+}
+
+# Detect remote HOME and PERLBREW_ROOT via transport
+sub detect_remote ($self) {
+    return unless $self->transport;
+    my $r = $self->transport->run('echo $HOME');
+    $self->remote_home($1) if $r->{ok} && $r->{output} =~ /^(\S+)/;
+
+    $r = $self->transport->run('echo $PERLBREW_ROOT');
+    if ($r->{ok} && $r->{output} =~ /^(\S+)/) {
+        $self->perlbrew_root($1);
+    } else {
+        # Default: $HOME/perl5/perlbrew
+        $self->perlbrew_root($self->_home . '/perl5/perlbrew');
+    }
+    return $self;
+}
+
+sub _home ($self) {
+    return $self->remote_home // $ENV{HOME};
+}
+
+sub _perlbrew_root ($self) {
+    return $self->perlbrew_root // $ENV{PERLBREW_ROOT} // ($self->_home . '/perl5/perlbrew');
 }
 
 sub _render_service_file ($self, $name, $svc) {
@@ -46,9 +74,6 @@ sub _render_service_file ($self, $name, $svc) {
     my $mode    = $svc->{mode} // 'production';
     my $runner  = $svc->{runner} // 'hypnotoad';
 
-    # bin_cmd contains shell-quoted env values with embedded single quotes.
-    # Escape backslashes and single quotes so the string survives being
-    # interpolated into a Perl single-quoted literal in the rendered file.
     my $bin_literal = $bin_cmd =~ s/([\\'])/\\$1/gr;
 
     return <<"END_UBIC";
@@ -71,7 +96,10 @@ sub _build_bin_cmd ($self, $name, $svc) {
     my $repo     = $svc->{repo};
     my $bin      = "$repo/$svc->{bin}";
     my $port     = $svc->{port};
-    my $app_home = $self->config->app_home;
+
+    my $home          = $self->_home;
+    my $perlbrew_root = $self->_perlbrew_root;
+    my $app_home      = $self->config->app_home;
 
     # Env vars from target config (non-secret, like MOJO_MODE)
     my $env = $svc->{env} // {};
@@ -82,7 +110,6 @@ sub _build_bin_cmd ($self, $name, $svc) {
     $all_env{PERL5LIB} = "$repo/local/lib/perl5";
 
     # Build PATH: repo local/bin + perlbrew perl bin + system
-    my $perlbrew_root = $ENV{PERLBREW_ROOT} // "$ENV{HOME}/perl5/perlbrew";
     $all_env{PATH} = join(':',
         "$repo/local/bin",
         "$perlbrew_root/perls/$perlbrew/bin",
@@ -100,11 +127,9 @@ sub _build_bin_cmd ($self, $name, $svc) {
     }
 
     # Source secrets from env file at runtime (never baked into the ubic file)
-    my $secrets_file = path($app_home, 'secrets', "$name.env");
-    my $source_secrets = '';
-    if (-f $secrets_file) {
-        $source_secrets = "set -a && . $secrets_file && set +a && ";
-    }
+    # Use app_home for local, or the remote app_home path for remote
+    my $secrets_path = "$app_home/secrets/$name.env";
+    my $source_secrets = "test -f $secrets_path && { set -a && . $secrets_path && set +a; }; ";
 
     if ($runner eq 'morbo') {
         return "bash -c '${source_secrets}perlbrew exec --with $perlbrew ${env_str}morbo -l http://127.0.0.1:$port $bin'";
@@ -122,7 +147,7 @@ sub _shell_quote ($val) {
 
 sub _ubic_file_path ($self, $name) {
     my ($group, $svc_name) = split /\./, $name, 2;
-    return path($ENV{HOME}, 'ubic', 'service', $group, $svc_name);
+    return path($self->_home, 'ubic', 'service', $group, $svc_name);
 }
 
 1;

@@ -171,15 +171,17 @@ sub run ($self, @args) {
 
     # --- Generate ubic service file ---
     say "  Generating ubic service...";
+    my $ubic = $self->ubic;
     if ($is_remote) {
-        # Generate locally to a temp file, upload to ~/ubic/service/<group>/<name>
-        my $gen = $self->ubic->generate($name);
+        $ubic->transport($transport);
+        $ubic->detect_remote;
+        my $gen = $ubic->generate($name);
         my ($group, $svc_name) = split /\./, $name, 2;
         $transport->run("mkdir -p ~/ubic/service/$group");
         $transport->upload($gen->{path}, "~/ubic/service/$group/$svc_name");
         $transport->run("chmod 600 ~/ubic/service/$group/$svc_name");
     } else {
-        $self->ubic->generate($name);
+        $ubic->generate($name);
     }
     say "  [OK] ubic service";
 
