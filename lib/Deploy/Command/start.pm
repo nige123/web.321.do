@@ -12,6 +12,16 @@ sub run ($self, @args) {
     my $transport = $self->transport_for($name, $target);
     $self->config->target($target);
     my $r = $transport->run("ubic start $name");
+
+    # Check if ubic knows about this service
+    if ($r->{output} && $r->{output} =~ /not found|unknown service/i) {
+        say "  \e[31m$name is not installed\e[0m";
+        say "";
+        say "  Next: install it first:";
+        say "    321 install $name" . ($target ne 'dev' ? " $target" : "");
+        return;
+    }
+
     say "  $r->{output}" if $r->{output} && $r->{output} =~ /\S/;
 
     # Verify it's actually running
@@ -30,7 +40,7 @@ sub run ($self, @args) {
         say "  \e[31m$name not running\e[0m after start";
         say "";
         say "  Next: check logs:";
-        say "    321 logs $name --stderr";
+        say "    321 logs $name" . ($target ne 'dev' ? " $target" : "") . " --stderr";
     }
 }
 
