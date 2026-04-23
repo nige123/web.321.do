@@ -207,7 +207,7 @@ sub print_steps ($self, $r) {
     }
 }
 
-sub print_failure ($self, $transport, $name, $target, $message) {
+sub print_failure ($self, $transport, $name, $target, $message = undef) {
     say "  $message" if $message;
     my @diag = $self->diagnose_stderr($transport, $name, $target);
     if (@diag) {
