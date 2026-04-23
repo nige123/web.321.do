@@ -24,17 +24,20 @@ sub run ($self, @args) {
 
     say "  $r->{output}" if $r->{output} && $r->{output} =~ /\S/;
 
-    # Verify it's actually running
-    sleep 1;
-    my $check = $transport->run("ubic status $name");
-    my $running = $check->{output} && $check->{output} =~ /running/;
-
+    # Verify it's actually running — check port, not just ubic
+    sleep 2;
     my $svc  = $self->config->service($name);
     my $port = $svc->{port} // '?';
     my $host = $svc->{host} // 'localhost';
     my $url  = $host ne 'localhost' ? "https://$host/" : "http://localhost:$port/";
 
-    if ($running) {
+    my $port_ok = 0;
+    if ($port && $port ne '?') {
+        my $check = $transport->run("curl -sf -o /dev/null --connect-timeout 2 http://127.0.0.1:$port/", timeout => 5);
+        $port_ok = $check->{ok};
+    }
+
+    if ($port_ok) {
         say "  \e[32m$name running\e[0m ($target)  port:$port  $url";
     } else {
         say "  \e[31m$name not running\e[0m after start";
