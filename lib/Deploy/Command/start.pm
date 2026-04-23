@@ -50,14 +50,14 @@ sub run ($self, @args) {
             say "  Perl deps are not fully installed.";
             say "";
             say "  Fix: install deps then restart:";
-            say "    321 go $name$target_flag";
+            say "    321 install $name$target_flag";
         } elsif ($stderr =~ /Can't locate (\S+\.pm)/s) {
             (my $module = $1) =~ s/\//::/g; $module =~ s/\.pm$//;
             say "  \e[33mMissing module: $module\e[0m";
             say "  Perl deps are not fully installed.";
             say "";
             say "  Fix: install deps then restart:";
-            say "    321 go $name$target_flag";
+            say "    321 install $name$target_flag";
         } else {
             say "  Next: check logs:";
             say "    321 logs $name$target_flag --stderr";
