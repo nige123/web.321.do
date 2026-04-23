@@ -27,6 +27,22 @@ sub run ($self, @args) {
         say "  $r->{message}  port:$port  $url";
     } else {
         say "  $r->{message}" if $r->{message};
+
+        # Check stderr for missing modules
+        my $target_flag = $target ne 'dev' ? " $target" : "";
+        my $logs = $transport->run("tail -20 /tmp/$name.stderr.log 2>/dev/null");
+        my $stderr = $logs->{output} // '';
+
+        if ($stderr =~ /Can't locate (\S+\.pm).*you may need to install the (\S+) module/s) {
+            say "";
+            say "  \e[33mMissing module: $2\e[0m";
+            say "  Fix: 321 go $name$target_flag";
+        } elsif ($stderr =~ /Can't locate (\S+\.pm)/s) {
+            (my $module = $1) =~ s/\//::/g; $module =~ s/\.pm$//;
+            say "";
+            say "  \e[33mMissing module: $module\e[0m";
+            say "  Fix: 321 go $name$target_flag";
+        }
     }
 }
 

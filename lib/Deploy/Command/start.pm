@@ -39,8 +39,29 @@ sub run ($self, @args) {
     } else {
         say "  \e[31m$name not running\e[0m after start";
         say "";
-        say "  Next: check logs:";
-        say "    321 logs $name" . ($target ne 'dev' ? " $target" : "") . " --stderr";
+
+        # Check stderr for common causes
+        my $target_flag = $target ne 'dev' ? " $target" : "";
+        my $logs = $transport->run("tail -20 /tmp/$name.stderr.log 2>/dev/null");
+        my $stderr = $logs->{output} // '';
+
+        if ($stderr =~ /Can't locate (\S+\.pm).*you may need to install the (\S+) module/s) {
+            say "  \e[33mMissing module: $2\e[0m";
+            say "  Perl deps are not fully installed.";
+            say "";
+            say "  Fix: install deps then restart:";
+            say "    321 go $name$target_flag";
+        } elsif ($stderr =~ /Can't locate (\S+\.pm)/s) {
+            (my $module = $1) =~ s/\//::/g; $module =~ s/\.pm$//;
+            say "  \e[33mMissing module: $module\e[0m";
+            say "  Perl deps are not fully installed.";
+            say "";
+            say "  Fix: install deps then restart:";
+            say "    321 go $name$target_flag";
+        } else {
+            say "  Next: check logs:";
+            say "    321 logs $name$target_flag --stderr";
+        }
     }
 }
 
