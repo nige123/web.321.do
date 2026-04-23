@@ -88,10 +88,14 @@ sub run ($self, @args) {
         say "  [OK] cpanm";
     }
 
-    # --- Clone repo ---
+    # --- Clone or pull repo ---
     say "  Checking repo $repo...";
     my $r = $transport->run("test -d $repo/.git && echo EXISTS");
-    unless ($r->{output} =~ /EXISTS/) {
+    if ($r->{output} =~ /EXISTS/) {
+        say "  Pulling latest...";
+        $r = $transport->run_in_dir($repo, "git fetch origin && git reset --hard origin/$branch", timeout => 60);
+        say $r->{ok} ? "  [OK] repo (updated)" : "  [WARN] git pull failed (continuing with existing)";
+    } else {
         say "  Cloning repo...";
         my $manifest = $self->config->service_raw($name);
         my $git_url = $manifest->{git_url} // $self->_guess_git_url($repo);
