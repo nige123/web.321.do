@@ -13,8 +13,16 @@ sub run ($self, @args) {
     $self->config->target($target);
     my $svc  = $self->config->service($name);
     my $port = $svc->{port} // '?';
+    my $url  = $self->service_url($svc);
 
-    # Check if port is already in use before starting
+    # Already running?
+    my $status = $transport->run("ubic status $name 2>&1");
+    if ($status->{ok} && $status->{output} =~ /running \(pid (\d+)\)/) {
+        say "  \e[32m$name is already running\e[0m  pid:$1  port:$port  $url";
+        return;
+    }
+
+    # Check if port is taken by something else
     if ($port && $port ne '?' && $self->check_port($port, $transport)) {
         my $who = $transport->run("ss -tlnp | grep :$port");
         say "  \e[31mPort $port is already in use\e[0m";
