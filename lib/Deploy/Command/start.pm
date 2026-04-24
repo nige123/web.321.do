@@ -50,7 +50,6 @@ sub run ($self, @args) {
 
     # Verify it's actually running — check port, not just ubic
     sleep 2;
-    my $url      = $self->service_url($svc);
     my $port_ok  = $self->check_port($port, $transport);
 
     if ($port_ok) {
