@@ -120,6 +120,24 @@ YAML
     say "  repo:   $repo_url" if $repo_url;
     say "  entry:  $entry" if $entry;
     say "  branch: $branch";
+
+    # Add dev hostname to /etc/hosts if not already there
+    my $dev_host = "$name.dev";
+    my $hosts_file = path('/etc/hosts');
+    if ($hosts_file->exists) {
+        my $content = $hosts_file->slurp_utf8;
+        if ($content =~ /\Q$dev_host\E/) {
+            say "  hosts:  $dev_host (already in /etc/hosts)";
+        } elsif (-w '/etc/hosts') {
+            $hosts_file->append_utf8("127.0.0.1  $dev_host\n");
+            say "  hosts:  added $dev_host to /etc/hosts";
+        } else {
+            say "";
+            say "  Add to /etc/hosts (needs sudo):";
+            say "    echo '127.0.0.1  $dev_host' | sudo tee -a /etc/hosts";
+        }
+    }
+
     say "";
     say "Next: review and edit, then install:";
     say "  nano 321.yml";

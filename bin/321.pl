@@ -3107,7 +3107,7 @@ runner: hypnotoad</pre>
                 <ul class="add-tips">
                     <li><strong>Ports</strong> &mdash; check the dashboard to see what&rsquo;s already in use.</li>
                     <li><strong>Naming</strong> &mdash; keep the group short and lowercase. It appears everywhere.</li>
-                    <li><strong>Dev parity</strong> &mdash; dev gets the same nginx + SSL as live. Run <code>321 hosts</code> after install.</li>
+                    <li><strong>Dev parity</strong> &mdash; dev gets the same nginx + SSL as live. <code>321 init</code> adds dev hostnames to <code>/etc/hosts</code>.</li>
                     <li><strong>No bin/runner field?</strong> &mdash; those come from <code>321.yml</code> in the service repo.</li>
                 </ul>
             </div>
