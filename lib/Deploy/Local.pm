@@ -8,9 +8,9 @@ has 'log';         # optional Mojo::Log instance
 
 # Wrap a command with perlbrew if the perlbrew attribute is set.
 sub _wrap ($self, $cmd) {
-    my $pb = $self->perlbrew;
-    return $cmd unless $pb;
-    return "bash -lc 'source ~/perl5/perlbrew/etc/bashrc && perlbrew use $pb && $cmd'";
+    # Local commands inherit the current environment — no perlbrew wrapping needed.
+    # The 321 process is already running under perlbrew, so ubic/cpanm/etc are on PATH.
+    return $cmd;
 }
 
 # run($cmd, %opts) — execute command via backtick, return {ok, output, exit_code}.
