@@ -24,7 +24,7 @@ sub run ($self, @args) {
 
     # Check if port is taken by something else
     if ($port && $port ne '?' && $self->check_port($port, $transport)) {
-        my $who = $transport->run("ss -tlnp | grep :$port");
+        my $who = $transport->run("ss -tlnp | grep ':$port '");
         say "  \e[31mPort $port is already in use\e[0m";
         say "  $who->{output}" if $who->{output} && $who->{output} =~ /\S/;
         say "";
