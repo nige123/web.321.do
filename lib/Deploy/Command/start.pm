@@ -14,6 +14,11 @@ sub run ($self, @args) {
     for my $name (@names) {
         $self->_start_one($name, $target);
     }
+
+    # Show status
+    say "";
+    require Deploy::Command::status;
+    Deploy::Command::status->new(app => $self->app)->run($svc_input, $target);
 }
 
 sub _start_one ($self, $name, $target) {
