@@ -18,6 +18,7 @@ sub _wrap ($self, $cmd) {
 sub run ($self, $cmd, %opts) {
     my $timeout = $opts{timeout} // 120;
     my $full_cmd = $self->_wrap($cmd);
+    warn "  [local] $full_cmd\n" if $ENV{VERBOSE};
     if ($self->log) {
         $self->log->info("Running: $full_cmd");
     }
@@ -40,6 +41,7 @@ sub run ($self, $cmd, %opts) {
 sub run_in_dir ($self, $dir, $cmd, %opts) {
     my $timeout = $opts{timeout} // 120;
     my $full_cmd = $self->_wrap("cd \Q$dir\E && $cmd");
+    warn "  [local] $full_cmd\n" if $ENV{VERBOSE};
     if ($self->log) {
         $self->log->info("Running: $full_cmd");
     }

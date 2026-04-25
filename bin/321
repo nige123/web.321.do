@@ -17,5 +17,10 @@ use File::Basename qw(dirname);
 
 my $app = dirname(__FILE__) . '/321.pl';
 
-# Pass all args through to the Mojolicious app
-exec('perl', $app, @ARGV);
+# Strip -v/--verbose flag and set env
+my @args = grep {
+    if ($_ eq '-v' || $_ eq '--verbose') { $ENV{VERBOSE} = 1; 0 }
+    else { 1 }
+} @ARGV;
+
+exec('perl', $app, @args);

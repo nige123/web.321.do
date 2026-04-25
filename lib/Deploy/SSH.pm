@@ -61,6 +61,7 @@ sub _scp_cmd ($self, $local, $remote) {
 sub run ($self, $cmd, %opts) {
     my $timeout  = $opts{timeout} // 120;
     my $full_cmd = $self->_ssh_cmd($cmd);
+    warn "  [ssh] $cmd\n" if $ENV{VERBOSE};
     if ($self->log) {
         $self->log->info("SSH run: $full_cmd");
     }
@@ -83,6 +84,7 @@ sub run ($self, $cmd, %opts) {
 sub run_in_dir ($self, $dir, $cmd, %opts) {
     my $timeout  = $opts{timeout} // 120;
     my $full_cmd = $self->_ssh_cmd_in_dir($dir, $cmd);
+    warn "  [ssh] cd $dir && $cmd\n" if $ENV{VERBOSE};
     if ($self->log) {
         $self->log->info("SSH run_in_dir: $full_cmd");
     }
