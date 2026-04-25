@@ -20,6 +20,11 @@ sub run ($self, @args) {
             say "  $name stop failed: $r->{output}";
         }
     }
+
+    # Show status
+    say "";
+    require Deploy::Command::status;
+    Deploy::Command::status->new(app => $self->app)->run($svc_input, $target);
 }
 
 1;
