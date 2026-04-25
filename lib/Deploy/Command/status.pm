@@ -42,6 +42,14 @@ sub run ($self, @args) {
         }
 
         printf "%-15s  %s  port:%-5s  %s\n", $name, $status_text, $port, $url;
+
+        if ($ubic_says_running && !$port_ok) {
+            my $flag = $self->target_flag($target);
+            say "               \e[33m^\e[0m process alive but not serving — try: 321 restart $name$flag";
+        } elsif (!$ubic_says_running && $ubic_status =~ /off|not running/) {
+            my $flag = $self->target_flag($target);
+            say "               \e[31m^\e[0m start with: 321 start $name$flag";
+        }
     }
 }
 
