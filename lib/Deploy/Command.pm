@@ -217,11 +217,11 @@ sub print_failure ($self, $transport, $name, $target, $message = undef) {
         say "  Fix: $diag[1]";
     }
 
-    # Show last 100 lines of stderr
-    my $logs = $transport->run("tail -100 /tmp/$name.stderr.log 2>/dev/null");
+    # Show last 30 lines of stderr
+    my $logs = $transport->run("tail -30 /tmp/$name.stderr.log 2>/dev/null");
     if ($logs->{output} && $logs->{output} =~ /\S/) {
         say "";
-        say "  --- stderr (last 100 lines) ---";
+        say "  --- stderr (last 30 lines) ---";
         for my $line (split /\n/, $logs->{output}) {
             say "  $line";
         }
