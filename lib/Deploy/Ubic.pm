@@ -114,10 +114,13 @@ sub _build_bin_cmd ($self, $name, $svc) {
     my $perlbrew_root = $self->_perlbrew_root;
     my $app_home      = $self->config->app_home;
 
-    # Env vars from target config (non-secret, like MOJO_MODE)
+    # Env vars from target config
     my $env = $svc->{env} // {};
     my %all_env = %$env;
     delete $all_env{$_} for grep { !defined $all_env{$_} || !length $all_env{$_} } keys %all_env;
+
+    # Set MOJO_MODE from the resolved mode (dev = development, live = production)
+    $all_env{MOJO_MODE} //= $svc->{mode} // 'production';
 
     # PERL5LIB for repo-local deps
     $all_env{PERL5LIB} = "$repo/local/lib/perl5";
