@@ -215,9 +215,18 @@ sub print_failure ($self, $transport, $name, $target, $message = undef) {
     if (@diag) {
         say "  $diag[0]";
         say "  Fix: $diag[1]";
+    }
+
+    # Show last 100 lines of stderr
+    my $logs = $transport->run("tail -100 /tmp/$name.stderr.log 2>/dev/null");
+    if ($logs->{output} && $logs->{output} =~ /\S/) {
+        say "";
+        say "  --- stderr (last 100 lines) ---";
+        for my $line (split /\n/, $logs->{output}) {
+            say "  $line";
+        }
     } else {
-        say "  Next: check logs:";
-        say "    321 logs $name" . $self->target_flag($target) . " --stderr";
+        say "  No stderr log at /tmp/$name.stderr.log";
     }
 }
 
