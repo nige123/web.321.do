@@ -147,6 +147,10 @@ sub _build_bin_cmd ($self, $name, $svc) {
     my $secrets_path = "$app_home/secrets/$name.env";
     my $source_secrets = "test -f $secrets_path && { set -a && . $secrets_path && set +a; }; ";
 
+    if ($runner eq 'script') {
+        return "bash -c '${source_secrets}perlbrew exec --with $perlbrew ${env_str}perl $bin'";
+    }
+
     if ($runner eq 'morbo') {
         return "bash -c '${source_secrets}perlbrew exec --with $perlbrew ${env_str}morbo -l http://127.0.0.1:$port $bin'";
     }

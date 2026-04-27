@@ -184,7 +184,8 @@ sub check_port ($self, $port, $transport) {
 
 sub service_url ($self, $svc) {
     my $host = $svc->{host} // 'localhost';
-    my $port = $svc->{port} // '?';
+    my $port = $svc->{port};
+    return '' unless $port;  # workers have no port
     return $host ne 'localhost' ? "https://$host/" : "http://localhost:$port/";
 }
 

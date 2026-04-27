@@ -45,6 +45,23 @@ sub _load_all ($self) {
         my $manifest = Deploy::Manifest->load($dir);
         next unless $manifest;
         $services{ $manifest->{name} } = $manifest;
+
+        # Expand workers into separate service entries
+        my $workers = $manifest->{workers} // {};
+        my ($group) = split /\./, $manifest->{name}, 2;
+        for my $worker_name (keys %$workers) {
+            my $w = $workers->{$worker_name};
+            my $full_name = "$group.$worker_name";
+            $services{$full_name} = {
+                %$manifest,
+                name    => $full_name,
+                entry   => $w->{cmd},
+                runner  => 'script',
+                health  => undef,
+                workers => {},          # don't recurse
+                _parent => $manifest->{name},
+            };
+        }
     }
     $self->_mtimes(\%mtimes);
     return \%services;
@@ -66,7 +83,8 @@ sub _resolve ($self, $name, $manifest) {
     my $target_name = $self->target;
     my $target = $manifest->{targets}{$target_name} // {};
 
-    my $runner = $target->{runner} // $manifest->{runner} // 'hypnotoad';
+    my $is_worker = $manifest->{runner} eq 'script';
+    my $runner = $is_worker ? 'script' : ($target->{runner} // $manifest->{runner} // 'hypnotoad');
 
     return {
         name         => $name,
@@ -75,7 +93,7 @@ sub _resolve ($self, $name, $manifest) {
         bin          => $manifest->{entry},
         mode         => $runner eq 'morbo' ? 'development' : 'production',
         runner       => $runner,
-        port         => $target->{port},
+        port         => $is_worker ? undef : $target->{port},
         host         => $target->{host} // 'localhost',
         apt_deps     => $manifest->{apt_deps} // [],
         health       => $manifest->{health} // '/health',
