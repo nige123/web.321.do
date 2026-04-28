@@ -17,7 +17,8 @@ sub status ($self, $name) {
 
     my $pid = $self->_get_pid($name, $svc);
     my $git_sha = $self->_git_sha($svc->{repo});
-    my $port_ok = $self->_check_port($svc->{port});
+    # Only check port if ubic says it's running — avoids 2s curl timeout per stopped service
+    my $port_ok = $pid ? $self->_check_port($svc->{port}) : 0;
 
     return {
         name    => $name,
@@ -37,9 +38,42 @@ sub status ($self, $name) {
 }
 
 sub all_status ($self) {
+    # Batch ubic status in one call — avoids N subprocess calls
+    my %ubic_pids;
+    my $r = $self->transport->run("ubic status");
+    if ($r->{ok}) {
+        for my $line (split /\n/, $r->{output} // '') {
+            if ($line =~ /^\s+(\S+)\t(?:running \(pid (\d+)\)|(.+))/) {
+                $ubic_pids{$1} = $2;  # undef if not running
+            }
+        }
+    }
+
     my @results;
     for my $name (@{ $self->config->service_names }) {
-        push @results, $self->status($name);
+        my $svc = $self->config->service($name);
+        next unless $svc;
+
+        my $pid = $ubic_pids{$name};
+        my $git_sha = $self->_git_sha($svc->{repo});
+        my $port_ok = $pid ? $self->_check_port($svc->{port}) : 0;
+
+        push @results, {
+            name    => $name,
+            pid     => $pid,
+            port    => $svc->{port},
+            running => $port_ok ? \1 : \0,
+            git_sha => $git_sha,
+            repo    => $svc->{repo},
+            branch  => $svc->{branch},
+            mode    => $svc->{mode} // 'production',
+            runner  => $svc->{runner} // 'hypnotoad',
+            host    => $svc->{host} // 'localhost',
+            ($svc->{is_worker} ? (is_worker => 1) : ()),
+            ($svc->{favicon}   ? (favicon   => $svc->{favicon}) : ()),
+            ($svc->{docs}      ? (docs      => $svc->{docs})    : ()),
+            ($svc->{admin}     ? (admin     => $svc->{admin})   : ()),
+        };
     }
     return \@results;
 }
@@ -308,7 +342,7 @@ sub _git_sha ($self, $repo) {
 
 sub _check_port ($self, $port) {
     return 0 unless $port;
-    my $r = $self->transport->run("curl -sf -o /dev/null --connect-timeout 2 http://127.0.0.1:$port/", timeout => 5);
+    my $r = $self->transport->run("curl -sf -o /dev/null --connect-timeout 1 http://127.0.0.1:$port/", timeout => 3);
     return $r->{ok} ? 1 : 0;
 }
 
