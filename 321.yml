@@ -25,7 +25,7 @@ test: prove -lr t              # run before deploying to live
 dev:
     host: 321.do.dev           # hostname for nginx + SSL (mkcert on dev)
     port: 9321
-    runner: morbo              # override runner for dev
+    runner: hypnotoad          # needs multi-worker for concurrent status checks
 
 live:
     host: 321.do

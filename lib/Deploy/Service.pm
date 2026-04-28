@@ -55,14 +55,16 @@ sub all_status ($self) {
         next unless $svc;
 
         my $pid = $ubic_pids{$name};
-        my $git_sha = $self->_git_sha($svc->{repo});
-        my $port_ok = $pid ? $self->_check_port($svc->{port}) : 0;
+        # Fast git sha: read .git/refs/heads directly instead of spawning git
+        my $git_sha = $self->_git_sha_fast($svc->{repo}, $svc->{branch});
+        # Trust ubic pid as running indicator — port check is too slow for dashboard
+        my $running = $pid ? 1 : 0;
 
         push @results, {
             name    => $name,
             pid     => $pid,
             port    => $svc->{port},
-            running => $port_ok ? \1 : \0,
+            running => $running ? \1 : \0,
             git_sha => $git_sha,
             repo    => $svc->{repo},
             branch  => $svc->{branch},
@@ -338,6 +340,17 @@ sub _git_sha ($self, $repo) {
     return undef unless $r->{ok};
     chomp(my $sha = $r->{output});
     return $sha || undef;
+}
+
+# Fast git sha: read .git/HEAD directly, no subprocess
+sub _git_sha_fast ($self, $repo, $branch) {
+    $branch //= 'master';
+    my $ref_file = path($repo, '.git', 'refs', 'heads', $branch);
+    return undef unless $ref_file->exists;
+    my $sha = $ref_file->slurp;
+    $sha =~ s/\s+//g;
+    return substr($sha, 0, 7) if length($sha) >= 7;
+    return undef;
 }
 
 sub _check_port ($self, $port) {
