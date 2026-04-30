@@ -28,9 +28,12 @@ sub generate ($self, $name) {
 
     my $provider = $self->cert_provider->pick($self->config->target);
     my $paths    = $self->cert_provider->cert_paths(provider => $provider, host => $host);
+    # /etc/letsencrypt/live/ is root-readable, so test -f as the deploy
+    # user always returns false. Use sudo on remote (mkcert paths in $HOME
+    # for dev don't need sudo, but it's harmless there too).
     my $has_ssl;
     if ($self->transport) {
-        my $check = $self->transport->run("test -f $paths->{cert}");
+        my $check = $self->transport->run("sudo test -f $paths->{cert}");
         $has_ssl = $check->{ok};
     } else {
         $has_ssl = -f $paths->{cert};
