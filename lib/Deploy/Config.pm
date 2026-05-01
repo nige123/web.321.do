@@ -107,6 +107,7 @@ sub _resolve ($self, $name, $manifest) {
         ($is_worker            ? (is_worker => 1)                    : ()),
         ($manifest->{test}     ? (test     => $manifest->{test})     : ()),
         ($manifest->{favicon}  ? (favicon  => $manifest->{favicon})  : ()),
+        (exists $manifest->{force_https} ? (force_https => $manifest->{force_https}) : ()),
         ($target->{ssh}        ? (ssh      => $target->{ssh})        : ()),
         ($target->{ssh_key}    ? (ssh_key  => $target->{ssh_key})    : ()),
         ($target->{docs}       ? (docs     => $target->{docs})       : ()),

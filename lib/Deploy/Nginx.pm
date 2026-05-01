@@ -39,7 +39,10 @@ sub generate ($self, $name) {
         $has_ssl = -f $paths->{cert};
     }
 
-    my $conf = $self->_render_config($host, $port, $has_ssl, $paths);
+    # force_https defaults true: HTTP redirects to HTTPS when SSL is set up.
+    # Set force_https: false in 321.yml for APIs that should answer on HTTP too.
+    my $force_https = $svc->{force_https} // 1;
+    my $conf = $self->_render_config($host, $port, $has_ssl, $paths, $force_https);
 
     my $dest = $self->sites_available . "/$host";
 
@@ -177,34 +180,8 @@ sub status ($self, $name) {
     };
 }
 
-sub _render_config ($self, $host, $port, $has_ssl, $paths) {
-    my $conf = <<"NGINX";
-server {
-    listen 80;
-    listen [::]:80;
-    server_name $host;
-
-NGINX
-
-    if ($has_ssl) {
-        $conf .= "    return 301 https://\$host\$request_uri;\n}\n\n";
-        $conf .= <<"NGINX";
-server {
-    listen 443 ssl;
-    listen [::]:443 ssl;
-    server_name $host;
-
-    ssl_certificate     $paths->{cert};
-    ssl_certificate_key $paths->{key};
-
-    ssl_protocols TLSv1.2;
-    ssl_ciphers HIGH:!aNULL:!MD5;
-    ssl_prefer_server_ciphers on;
-
-NGINX
-    }
-
-    $conf .= <<"NGINX";
+sub _render_config ($self, $host, $port, $has_ssl, $paths, $force_https = 1) {
+    my $proxy_block = <<"NGINX";
     access_log /var/log/nginx/${host}.access.log;
     error_log  /var/log/nginx/${host}.error.log;
 
@@ -221,6 +198,40 @@ NGINX
     }
 }
 NGINX
+
+    my $conf = <<"NGINX";
+server {
+    listen 80;
+    listen [::]:80;
+    server_name $host;
+
+NGINX
+
+    if ($has_ssl && $force_https) {
+        $conf .= "    return 301 https://\$host\$request_uri;\n}\n\n";
+    } else {
+        # Either no cert, or force_https is off — proxy_pass through HTTP.
+        $conf .= $proxy_block;
+        $conf .= "\n" if $has_ssl;
+    }
+
+    if ($has_ssl) {
+        $conf .= <<"NGINX";
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    server_name $host;
+
+    ssl_certificate     $paths->{cert};
+    ssl_certificate_key $paths->{key};
+
+    ssl_protocols TLSv1.2;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+    ssl_prefer_server_ciphers on;
+
+NGINX
+        $conf .= $proxy_block;
+    }
 
     return $conf;
 }

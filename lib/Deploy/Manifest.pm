@@ -9,7 +9,7 @@ my $ENV_KEY_RE   = qr/^[A-Z_][A-Z0-9_]*$/;
 
 my %IDENTITY_KEY = map { $_ => 1 } qw(
     name entry runner perl health branch repo test
-    env_required env_optional apt_deps favicon workers
+    env_required env_optional apt_deps favicon workers force_https
 );
 
 sub load ($class, $repo_dir) {
@@ -56,6 +56,7 @@ sub load ($class, $repo_dir) {
         ($raw->{test}    ? (test    => $raw->{test})    : ()),
         ($raw->{favicon} ? (favicon => $raw->{favicon}) : ()),
         ($raw->{workers} ? (workers => $raw->{workers}) : ()),
+        (exists $raw->{force_https} ? (force_https => $raw->{force_https}) : ()),
     };
 }
 
