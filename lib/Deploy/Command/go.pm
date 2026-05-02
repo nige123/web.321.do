@@ -56,6 +56,43 @@ sub run ($self, @args) {
     my $r = $svc_mgr->deploy($name, skip_git => $skip_git);
     $self->print_steps($r);
     say "  $r->{message}" if $r->{message};
+
+    $self->_check_cert_health($name, $target, $transport);
+}
+
+sub _check_cert_health ($self, $name, $target, $transport) {
+    my $svc = $self->config->service($name);
+    my $host = $svc->{host} // 'localhost';
+    return if $host eq 'localhost' || $target eq 'dev';
+
+    my $probe = $self->nginx->probe_cert($host);
+    return if $probe->{ok};
+
+    say "";
+    say "  \e[33mSSL: $probe->{error}\e[0m" if $probe->{error};
+    say "  Setting up nginx + SSL on $target...";
+
+    $self->nginx->transport($transport);
+    my $setup = $self->nginx->setup($name);
+    for my $step (@{ $setup->{steps} // [] }) {
+        printf "  [%s] %s\n", ($self->step_ok($step) ? 'OK' : 'FAIL'), $step->{step};
+    }
+
+    my $cert = $self->nginx->acquire_cert($name);
+    if ($cert->{status} eq 'ok') {
+        say "  [OK] cert acquired ($cert->{provider})";
+        $self->nginx->generate($name);
+        $self->nginx->reload;
+        say "  [OK] nginx reloaded with SSL";
+
+        my $reprobe = $self->nginx->probe_cert($host);
+        say $reprobe->{ok}
+          ? "  \e[32mhttps://$host serves the right cert\e[0m"
+          : "  \e[31mstill wrong cert: $reprobe->{error}\e[0m";
+    } else {
+        say "  [FAIL] cert acquisition";
+        say "  $cert->{output}" if $cert->{output};
+    }
 }
 
 1;

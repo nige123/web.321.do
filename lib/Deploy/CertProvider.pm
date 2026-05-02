@@ -45,7 +45,10 @@ sub acquire_cmd ($self, %o) {
              . "sudo chmod 640 $paths->{key}";
     }
 
-    return "certbot certonly --standalone -d $host "
+    # --webroot lets certbot renew without stopping nginx. The acme-challenge
+    # location in our nginx template serves /var/www/letsencrypt/.well-known.
+    return "sudo mkdir -p /var/www/letsencrypt && "
+         . "sudo certbot certonly --webroot -w /var/www/letsencrypt -d $host "
          . "--non-interactive --agree-tos -m admin\@$host";
 }
 

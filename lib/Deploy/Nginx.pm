@@ -132,11 +132,26 @@ sub acquire_cert ($self, $name) {
 
     my $provider = $self->cert_provider->pick($self->config->target);
     my $paths    = $self->cert_provider->cert_paths(provider => $provider, host => $host);
-    return { status => 'ok', message => 'SSL cert already exists' } if -f $paths->{cert};
+
+    # Existing-cert check: letsencrypt paths are root-readable, so use sudo
+    # via transport. mkcert paths in $HOME don't need sudo, but it's harmless.
+    if ($self->transport) {
+        my $r = $self->transport->run("sudo test -f $paths->{cert}");
+        return { status => 'ok', message => 'SSL cert already exists' } if $r->{ok};
+    } elsif (-f $paths->{cert}) {
+        return { status => 'ok', message => 'SSL cert already exists' };
+    }
 
     my $cmd = $self->cert_provider->acquire_cmd(provider => $provider, host => $host);
-    my $output = `$cmd 2>&1`;
-    my $ok = $? == 0;
+
+    my ($output, $ok);
+    if ($self->transport) {
+        my $r = $self->transport->run("$cmd 2>&1");
+        ($output, $ok) = ($r->{output}, $r->{ok});
+    } else {
+        $output = `$cmd 2>&1`;
+        $ok = $? == 0;
+    }
     return { status => ($ok ? 'ok' : 'error'), output => $output, provider => $provider };
 }
 
@@ -171,12 +186,62 @@ sub status ($self, $name) {
     my $provider = $self->cert_provider->pick($self->config->target);
     my $paths    = $self->cert_provider->cert_paths(provider => $provider, host => $host);
 
+    my $avail = path($self->sites_available, $host);
+    my $link  = path($self->sites_enabled,   $host);
+
+    my ($config_exists, $enabled, $ssl);
+    if ($self->transport) {
+        # /etc/nginx/sites-available is world-readable, but letsencrypt is not —
+        # use sudo for the cert check so it works without root privileges.
+        $config_exists = $self->transport->run("test -f $avail")->{ok}        ? 1 : 0;
+        $enabled       = $self->transport->run("test -L $link")->{ok}         ? 1 : 0;
+        $ssl           = $self->transport->run("sudo test -f $paths->{cert}")->{ok} ? 1 : 0;
+    } else {
+        $config_exists = -f $avail        ? 1 : 0;
+        $enabled       = -l $link         ? 1 : 0;
+        $ssl           = -f $paths->{cert} ? 1 : 0;
+    }
+
     return {
-        config_exists => -f path($self->sites_available, $host) ? 1 : 0,
-        enabled       => -l path($self->sites_enabled,   $host) ? 1 : 0,
-        ssl           => -f $paths->{cert} ? 1 : 0,
+        config_exists => $config_exists,
+        enabled       => $enabled,
+        ssl           => $ssl,
         provider      => $provider,
         host          => $host,
+    };
+}
+
+sub probe_cert ($self, $host) {
+    return { ok => 0, host => $host, error => 'invalid host' }
+        unless $self->_valid_host($host);
+
+    # Probes the public HTTPS endpoint and returns what cert it sees. Used
+    # both by `321 doctor` (audit all live hosts) and by `321 go live` (refuse
+    # to mark a deploy as complete if the wrong cert is being served).
+    my $cmd = "timeout 5 openssl s_client -servername $host -connect $host:443 "
+            . "-verify_return_error </dev/null 2>/dev/null "
+            . "| openssl x509 -noout -subject -ext subjectAltName 2>/dev/null";
+    my $out = `$cmd`;
+
+    return { ok => 0, host => $host, error => 'no TLS response' }
+        unless $out =~ /\S/;
+
+    my ($cn) = $out =~ /subject=.*?CN\s*=\s*([^\s,]+)/;
+    my @sans;
+    if ($out =~ /Subject Alternative Name:\s*\n\s*(.+)/) {
+        @sans = map { (my $s = $_) =~ s/^DNS://; $s =~ s/^\s+|\s+$//g; $s }
+                split /,/, $1;
+    }
+
+    my @candidates = grep { defined && length } ($cn, @sans);
+    my $matches = grep { lc($_) eq lc($host) } @candidates;
+
+    return {
+        ok      => $matches ? 1 : 0,
+        host    => $host,
+        cn      => $cn,
+        sans    => \@sans,
+        $matches ? () : (error => "cert is for " . ($cn // 'unknown') . ", not $host"),
     };
 }
 
@@ -199,16 +264,25 @@ sub _render_config ($self, $host, $port, $has_ssl, $paths, $force_https = 1) {
 }
 NGINX
 
+    # ACME http-01 challenge served from webroot. Lets certbot renew without
+    # any service interruption: no --standalone (which needs port 80 free).
+    my $acme_block = <<"NGINX";
+    location /.well-known/acme-challenge/ {
+        root /var/www/letsencrypt;
+    }
+NGINX
+
     my $conf = <<"NGINX";
 server {
     listen 80;
     listen [::]:80;
     server_name $host;
 
+$acme_block
 NGINX
 
     if ($has_ssl && $force_https) {
-        $conf .= "    return 301 https://\$host\$request_uri;\n}\n\n";
+        $conf .= "    location / { return 301 https://\$host\$request_uri; }\n}\n\n";
     } else {
         # Either no cert, or force_https is off — proxy_pass through HTTP.
         $conf .= $proxy_block;
