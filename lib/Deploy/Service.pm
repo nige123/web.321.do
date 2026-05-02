@@ -11,6 +11,7 @@ has 'config';     # Deploy::Config instance
 has 'log';        # Mojo::Log instance
 has 'ubic_mgr';   # Deploy::Ubic instance
 has 'transport' => sub { Deploy::Local->new };
+has 'filter_to_local' => 0;  # set true on the live dashboard
 
 sub status ($self, $name) {
     my $svc = $self->config->service($name);
@@ -35,6 +36,12 @@ sub all_status ($self) {
     for my $name (@{ $self->config->service_names }) {
         my $svc = $self->config->service($name);
         next unless $svc;
+
+        # On the live deployment of 321.do, hide services not actually
+        # installed on this box — dev-only services would just be noise.
+        # On dev we keep them all so the local dashboard can survey both
+        # targets via the target switcher.
+        next if $self->filter_to_local && !exists $statuses->{$name};
 
         my $pid = $statuses->{$name}{pid};
         my $git_sha = $self->_git_sha($svc->{repo}, $svc->{branch});

@@ -31,9 +31,10 @@ my $ubic_mgr = Deploy::Ubic->new(
 );
 
 my $service_mgr = Deploy::Service->new(
-    config   => $config,
-    log      => app->log,
-    ubic_mgr => $ubic_mgr,
+    config          => $config,
+    log             => app->log,
+    ubic_mgr        => $ubic_mgr,
+    filter_to_local => app->mode eq 'production' ? 1 : 0,
 );
 
 my $logs_mgr = Deploy::Logs->new(
