@@ -287,6 +287,11 @@ NGINX
     }
 
     if ($has_ssl) {
+        # HSTS only when we're forcing HTTPS — a force_https=false service
+        # legitimately answers on HTTP, so don't lock browsers out.
+        my $hsts = $force_https
+            ? "    add_header Strict-Transport-Security \"max-age=31536000\" always;\n"
+            : '';
         $conf .= <<"NGINX";
 server {
     listen 443 ssl;
@@ -300,6 +305,7 @@ server {
     ssl_ciphers HIGH:!aNULL:!MD5;
     ssl_prefer_server_ciphers on;
 
+$hsts
 NGINX
         $conf .= $proxy_block;
     }
