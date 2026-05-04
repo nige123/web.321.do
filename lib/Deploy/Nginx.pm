@@ -17,6 +17,24 @@ sub _valid_host ($self, $host) {
     return $host && $host =~ /^[a-zA-Z0-9]([a-zA-Z0-9\-\.]*[a-zA-Z0-9])?$/;
 }
 
+sub _file_exists ($self, $path, %opt) {
+    my $sudo = $opt{sudo};
+    if ($self->transport) {
+        my $cmd = ($sudo ? 'sudo ' : '') . "test -f $path";
+        return $self->transport->run($cmd)->{ok} ? 1 : 0;
+    }
+    return -f $path ? 1 : 0;
+}
+
+sub _run ($self, $cmd) {
+    if ($self->transport) {
+        my $r = $self->transport->run("$cmd 2>&1");
+        return { ok => $r->{ok}, output => $r->{output} };
+    }
+    my $output = `$cmd 2>&1`;
+    return { ok => ($? == 0), output => $output };
+}
+
 sub generate ($self, $name) {
     my $svc = $self->config->service($name);
     return { status => 'error', message => "Unknown service: $name" } unless $svc;
@@ -28,16 +46,8 @@ sub generate ($self, $name) {
 
     my $provider = $self->cert_provider->pick($self->config->target);
     my $paths    = $self->cert_provider->cert_paths(provider => $provider, host => $host);
-    # /etc/letsencrypt/live/ is root-readable, so test -f as the deploy
-    # user always returns false. Use sudo on remote (mkcert paths in $HOME
-    # for dev don't need sudo, but it's harmless there too).
-    my $has_ssl;
-    if ($self->transport) {
-        my $check = $self->transport->run("sudo test -f $paths->{cert}");
-        $has_ssl = $check->{ok};
-    } else {
-        $has_ssl = -f $paths->{cert};
-    }
+    # /etc/letsencrypt/live/ is root-readable; sudo so unprivileged probes work.
+    my $has_ssl = $self->_file_exists($paths->{cert}, sudo => 1);
 
     # force_https defaults true: HTTP redirects to HTTPS when SSL is set up.
     # Set force_https: false in 321.yml for APIs that should answer on HTTP too.
@@ -133,26 +143,12 @@ sub acquire_cert ($self, $name) {
     my $provider = $self->cert_provider->pick($self->config->target);
     my $paths    = $self->cert_provider->cert_paths(provider => $provider, host => $host);
 
-    # Existing-cert check: letsencrypt paths are root-readable, so use sudo
-    # via transport. mkcert paths in $HOME don't need sudo, but it's harmless.
-    if ($self->transport) {
-        my $r = $self->transport->run("sudo test -f $paths->{cert}");
-        return { status => 'ok', message => 'SSL cert already exists' } if $r->{ok};
-    } elsif (-f $paths->{cert}) {
-        return { status => 'ok', message => 'SSL cert already exists' };
-    }
+    return { status => 'ok', message => 'SSL cert already exists' }
+        if $self->_file_exists($paths->{cert}, sudo => 1);
 
     my $cmd = $self->cert_provider->acquire_cmd(provider => $provider, host => $host);
-
-    my ($output, $ok);
-    if ($self->transport) {
-        my $r = $self->transport->run("$cmd 2>&1");
-        ($output, $ok) = ($r->{output}, $r->{ok});
-    } else {
-        $output = `$cmd 2>&1`;
-        $ok = $? == 0;
-    }
-    return { status => ($ok ? 'ok' : 'error'), output => $output, provider => $provider };
+    my $r   = $self->_run($cmd);
+    return { status => ($r->{ok} ? 'ok' : 'error'), output => $r->{output}, provider => $provider };
 }
 
 sub certbot ($self, $name) { $self->acquire_cert($name) }  # backwards compat
@@ -191,11 +187,15 @@ sub status ($self, $name) {
 
     my ($config_exists, $enabled, $ssl);
     if ($self->transport) {
-        # /etc/nginx/sites-available is world-readable, but letsencrypt is not —
-        # use sudo for the cert check so it works without root privileges.
-        $config_exists = $self->transport->run("test -f $avail")->{ok}        ? 1 : 0;
-        $enabled       = $self->transport->run("test -L $link")->{ok}         ? 1 : 0;
-        $ssl           = $self->transport->run("sudo test -f $paths->{cert}")->{ok} ? 1 : 0;
+        # One round trip — letsencrypt path needs sudo; the others don't.
+        my $out = $self->transport->run(
+            "test -f $avail && echo A; "
+          . "test -L $link  && echo B; "
+          . "sudo test -f $paths->{cert} && echo C"
+        )->{output} // '';
+        $config_exists = $out =~ /^A$/m ? 1 : 0;
+        $enabled       = $out =~ /^B$/m ? 1 : 0;
+        $ssl           = $out =~ /^C$/m ? 1 : 0;
     } else {
         $config_exists = -f $avail        ? 1 : 0;
         $enabled       = -l $link         ? 1 : 0;
@@ -215,10 +215,7 @@ sub probe_cert ($self, $host) {
     return { ok => 0, host => $host, error => 'invalid host' }
         unless $self->_valid_host($host);
 
-    # Probes the public HTTPS endpoint and returns what cert it sees. Used
-    # both by `321 doctor` (audit all live hosts) and by `321 go live` (refuse
-    # to mark a deploy as complete if the wrong cert is being served).
-    my $cmd = "timeout 5 openssl s_client -servername $host -connect $host:443 "
+    my $cmd = "timeout 3 openssl s_client -servername $host -connect $host:443 "
             . "-verify_return_error </dev/null 2>/dev/null "
             . "| openssl x509 -noout -subject -ext subjectAltName 2>/dev/null";
     my $out = `$cmd`;

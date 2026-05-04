@@ -38,19 +38,18 @@ YAML
 
 my $cfg = Deploy::Config->new(app_home => "$home_obj", scan_dir => "$scan_obj", target => 'live');
 
-subtest 'status uses transport for remote checks' => sub {
+subtest 'status uses transport for remote checks (one round trip)' => sub {
     my $tx = FakeTransport->new;
     $tx->replies({
-        '^test -f .*sites-available' => { ok => 1, output => '' },
-        '^test -L .*sites-enabled'   => { ok => 1, output => '' },
-        '^sudo test -f .*letsencrypt' => { ok => 1, output => '' },
+        'sites-available' => { ok => 1, output => "A\nB\nC\n" },
     });
     my $n = Deploy::Nginx->new(config => $cfg, transport => $tx);
     my $s = $n->status('demo.web');
     is $s->{config_exists}, 1, 'config_exists from transport';
     is $s->{enabled},       1, 'enabled from transport';
-    is $s->{ssl},           1, 'ssl from transport (sudo)';
-    ok grep(/^sudo test -f/, @{ $tx->{commands} }), 'cert check ran via sudo';
+    is $s->{ssl},           1, 'ssl from transport';
+    is scalar(@{ $tx->commands }), 1, 'all checks in a single round trip';
+    like $tx->commands->[0], qr/sudo test -f .*letsencrypt/, 'cert check uses sudo';
 };
 
 subtest 'acquire_cert uses transport with sudo for existing-cert probe' => sub {

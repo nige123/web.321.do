@@ -74,25 +74,24 @@ sub _check_cert_health ($self, $name, $target, $transport) {
 
     $self->nginx->transport($transport);
     my $setup = $self->nginx->setup($name);
-    for my $step (@{ $setup->{steps} // [] }) {
-        printf "  [%s] %s\n", ($self->step_ok($step) ? 'OK' : 'FAIL'), $step->{step};
-    }
+    $self->print_steps({ data => $setup });
 
     my $cert = $self->nginx->acquire_cert($name);
-    if ($cert->{status} eq 'ok') {
-        say "  [OK] cert acquired ($cert->{provider})";
-        $self->nginx->generate($name);
-        $self->nginx->reload;
-        say "  [OK] nginx reloaded with SSL";
-
-        my $reprobe = $self->nginx->probe_cert($host);
-        say $reprobe->{ok}
-          ? "  \e[32mhttps://$host serves the right cert\e[0m"
-          : "  \e[31mstill wrong cert: $reprobe->{error}\e[0m";
-    } else {
+    unless ($cert->{status} eq 'ok') {
         say "  [FAIL] cert acquisition";
         say "  $cert->{output}" if $cert->{output};
+        return;
     }
+
+    say "  [OK] cert acquired ($cert->{provider})";
+    $self->nginx->generate($name);
+    $self->nginx->reload;
+    say "  [OK] nginx reloaded with SSL";
+
+    my $reprobe = $self->nginx->probe_cert($host);
+    say $reprobe->{ok}
+      ? "  \e[32mhttps://$host serves the right cert\e[0m"
+      : "  \e[31mstill wrong cert: $reprobe->{error}\e[0m";
 }
 
 1;

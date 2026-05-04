@@ -23,7 +23,7 @@ sub run ($self, @args) {
     }
 
     my $bad = grep { !$_->{probe}{ok} } @rows;
-    say "Checked " . scalar(@rows) . " host(s) on $target target  ("
+    say "Checked " . scalar(@rows) . " host(s) on $target target ("
         . ($bad ? "\e[31m$bad failing\e[0m" : "\e[32mall good\e[0m") . ")";
     say "";
 
