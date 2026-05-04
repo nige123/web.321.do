@@ -65,8 +65,13 @@ sub regenerate_if_stale ($self, $name) {
 
 sub upload_remote ($self, $transport, $name, $gen) {
     my ($group, $svc_name) = split /\./, $name, 2;
+    my $dest = "~/ubic/service/$group/$svc_name";
     $transport->run("mkdir -p ~/ubic/service/$group");
-    $transport->upload($gen->{path}, "~/ubic/service/$group/$svc_name");
+    # Drop any stale symlink/file first; old layouts pointed at
+    # <repo>/ubic/... and scp would either write through the dangling link
+    # silently (broken target) or update the wrong file (live target).
+    $transport->run("rm -f $dest");
+    $transport->upload($gen->{path}, $dest);
 }
 
 # Detect remote HOME and PERLBREW_ROOT via transport (single SSH call)
