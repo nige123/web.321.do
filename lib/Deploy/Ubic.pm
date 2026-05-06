@@ -168,13 +168,12 @@ sub _build_bin_cmd ($self, $name, $svc) {
     my $secrets_path = "$app_home/secrets/$name.env";
     my $source_secrets = "test -f $secrets_path && { set -a && . $secrets_path && set +a; }; ";
 
-    # hypnotoad -f keeps the process foreground; ubic SimpleDaemon requires that
-    my %tail = (
-        script    => "perl $bin",
-        morbo     => "morbo -l http://127.0.0.1:$port $bin",
-        hypnotoad => "hypnotoad -f $bin",
-    );
-    my $cmd = $tail{$runner} // $tail{hypnotoad};
+    # hypnotoad -f keeps the process foreground; ubic SimpleDaemon requires that.
+    # Workers (runner=script) have no port — only build the tail we actually use.
+    my $cmd
+        = $runner eq 'script' ? "perl $bin"
+        : $runner eq 'morbo'  ? "morbo -l http://127.0.0.1:$port $bin"
+        :                       "hypnotoad -f $bin";
     return "bash -c '${source_secrets}perlbrew exec --with $perlbrew ${env_str}$cmd'";
 }
 
