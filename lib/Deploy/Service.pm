@@ -132,16 +132,21 @@ sub deploy ($self, $name, %opts) {
     return $self->_deploy_result($name, 'error', 'Ubic restart failed', \@steps)
         unless $self->_ok($s);
 
-    sleep 2;
-    $s = $self->_step_port_check($svc);
-    push @steps, $s;
+    # Workers have no port to probe — ubic_restart success is the deploy
+    # success criterion for them.
+    my $final_ok = 1;
+    unless ($svc->{is_worker}) {
+        sleep 2;
+        $s = $self->_step_port_check($svc);
+        push @steps, $s;
+        $final_ok = $self->_ok($s);
+    }
 
     $self->_log_deploy($name, \@steps);
 
     my $tag = $skip_git ? ' (dev)' : '';
-    my $port_ok = $self->_ok($s);
-    my $final_status = $port_ok ? 'success' : 'error';
-    my $final_msg = $port_ok
+    my $final_status = $final_ok ? 'success' : 'error';
+    my $final_msg = $final_ok
         ? "Deployed $name$tag successfully"
         : "Deployed $name$tag but port check failed";
     return $self->_deploy_result($name, $final_status, $final_msg, \@steps);
@@ -204,6 +209,10 @@ sub restart ($self, $name) {
     push @steps, $s;
     return $self->_deploy_result($name, 'error', 'Ubic restart failed', \@steps)
         unless $self->_ok($s);
+
+    if ($svc->{is_worker}) {
+        return $self->_deploy_result($name, 'success', "Restarted $name", \@steps);
+    }
 
     sleep 2;
     $s = $self->_step_port_check($svc);
