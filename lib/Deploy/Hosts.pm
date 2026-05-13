@@ -45,7 +45,37 @@ sub write ($self, $hosts) {
     my $block = $self->_build_block($hosts);
     $content .= $block if length $block;
 
-    $file->spew_utf8($content);
+    if ($self->_writable) {
+        $file->spew_utf8($content);
+    }
+    else {
+        # /etc/hosts is root-owned — stage the new file and sudo it into place.
+        require File::Temp;
+        my $tmp = File::Temp->new;
+        binmode $tmp, ':encoding(UTF-8)';
+        print $tmp $content;
+        close $tmp;
+        system('sudo', 'cp', $tmp->filename, "$file") == 0
+            or die "failed to write $file (needs sudo)\n";
+    }
+}
+
+sub _writable ($self) {
+    my $p = $self->path;
+    return -w $p if -e $p;
+    return -w Path::Tiny::path($p)->parent->stringify;
+}
+
+# Reconcile the managed block with the desired host list. No-op (and no sudo
+# prompt) when they already match, so it's cheap to call on every deploy.
+# Returns 1 if it changed anything, 0 otherwise.
+sub sync ($self, $wanted) {
+    my $have = join "\0", sort @{ $self->read };
+    my %seen;
+    my @want = grep { !$seen{$_}++ } @$wanted;
+    return 0 if $have eq join "\0", sort @want;
+    $self->write([ sort @want ]);
+    return 1;
 }
 
 1;

@@ -59,4 +59,18 @@ subtest 'reject invalid hostname' => sub {
     like $err, qr/invalid hostname/;
 };
 
+subtest 'sync only writes when the set differs' => sub {
+    my $h = Deploy::Hosts->new(path => "$hosts");
+    $h->write([qw(dev.a.do dev.b.do)]);
+    my $before = $hosts->slurp_utf8;
+
+    is $h->sync([qw(dev.b.do dev.a.do)]), 0, 'no change when same set (order/dupes ignored)';
+    is $h->sync([qw(dev.a.do dev.a.do dev.b.do)]), 0, 'duplicates do not count as a change';
+    is $hosts->slurp_utf8, $before, 'file untouched when nothing changed';
+
+    is $h->sync([qw(dev.a.do dev.b.do dev.c.do)]), 1, 'reports a change when a host is added';
+    like $hosts->slurp_utf8, qr/dev\.c\.do/, 'new host written';
+    is_deeply [sort @{ $h->read }], [qw(dev.a.do dev.b.do dev.c.do)];
+};
+
 done_testing;

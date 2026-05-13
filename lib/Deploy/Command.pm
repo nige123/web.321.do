@@ -221,6 +221,10 @@ sub print_steps ($self, $r) {
     for my $step (@{ $r->{data}{steps} // [] }) {
         my $ok = $self->step_ok($step);
         printf "  [%s] %s\n", ($ok ? 'OK' : 'FAIL'), $step->{step};
+        next if $ok;
+        # Show why a step failed — the error from cpanm, nginx -t, the port
+        # check hint, etc. Successful steps stay quiet.
+        say "      $_" for grep { length } split /\n/, ($step->{output} // '');
     }
 }
 

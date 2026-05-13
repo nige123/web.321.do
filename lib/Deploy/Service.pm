@@ -187,12 +187,36 @@ sub _ok ($self, $step) {
 }
 
 sub _step_port_check ($self, $svc) {
-    my $ok = $self->_check_port($svc->{port});
-    return {
-        step    => 'port_check',
-        success => $ok ? \1 : \0,
-        output  => $ok ? "Port $svc->{port} responding" : "Port $svc->{port} not responding",
-    };
+    my $port = $svc->{port};
+    return { step => 'port_check', success => \1, output => "Port $port responding" }
+        if $self->_check_port($port);
+
+    my $output = "Port $port not responding";
+    # Common cause for hypnotoad services: the app's own config binds a
+    # different port than the 321 manifest declares. hypnotoad takes its
+    # listen port from app->config->{hypnotoad}{listen}, which 321 can't pass
+    # on the command line — so if the app is up on some other port, say so.
+    if (($svc->{runner} // 'hypnotoad') eq 'hypnotoad') {
+        my $bound = $self->_logged_listen_port($svc);
+        if ($bound && $bound != $port && $self->_check_port($bound)) {
+            $output .= " — the app is actually serving on $bound."
+                     . "  Add  'hypnotoad' => { listen => ['http://*:$port'] }  to the"
+                     . " app's production config so it matches the 321 manifest.";
+        }
+    }
+    return { step => 'port_check', success => \0, output => $output };
+}
+
+# Last "Listening at http://...:PORT" line in the service's stderr log, or
+# undef. Used only to explain a port_check failure.
+sub _logged_listen_port ($self, $svc) {
+    my $log = ($svc->{logs} // {})->{stderr} or return undef;
+    my $r = $self->transport->run(
+        qq{grep -oE 'Listening at "http://[^"]+"' '$log' 2>/dev/null | tail -1}
+    );
+    return undef unless $r->{ok} && defined $r->{output};
+    my ($p) = $r->{output} =~ /:(\d+)"/;
+    return $p;
 }
 
 sub deploy_dev ($self, $name) {
