@@ -12,7 +12,6 @@ use Mojo::Log;
 # Caller must hold $scan_obj and $home_obj alive to prevent tempdir cleanup.
 sub make_fixture {
     my $home_obj = tempdir(CLEANUP => 1);
-    path($home_obj, 'secrets')->mkpath;
 
     my $scan_obj = tempdir(CLEANUP => 1);
     my $repo = path($scan_obj, 'web.demo.do');

@@ -94,26 +94,6 @@ dev:
 #     port: 8080
 #     runner: hypnotoad
 
-# === Environment Variables ===
-#
-# env_required: keys the app MUST have to start.
-#   Deploy is blocked if any are missing from secrets/<name>.env
-#   Values here are descriptions, not the actual secrets.
-#
-# env_optional: keys with sensible defaults.
-#   Only set these if you need to override the default.
-
-# env_required:
-#   DATABASE_URL: "Postgres connection string (e.g. postgresql://user:pass\@host/db)"
-#   SECRET_KEY: "Session signing key"
-
-# env_optional:
-#   LOG_LEVEL:
-#     default: info
-#     desc: "debug | info | warn | error"
-#   MOJO_MODE:
-#     default: production
-#     desc: "production | development"
 YAML
 
     say "Created 321.yml for $name";

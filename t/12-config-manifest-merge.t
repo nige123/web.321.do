@@ -5,7 +5,6 @@ use Path::Tiny qw(tempdir path);
 use Deploy::Config;
 
 my $home = tempdir(CLEANUP => 1);
-path($home, 'secrets')->mkpath;
 my $scan = tempdir(CLEANUP => 1);
 
 my $repo = path($scan, 'web.demo.do');
@@ -16,11 +15,6 @@ entry: bin/demo.pl
 runner: hypnotoad
 perl: perl-5.42.1
 health: /health
-env_required:
-  API_KEY: "upstream API"
-env_optional:
-  LOG_LEVEL:
-    default: info
 live:
   host: demo.do
   port: 9400
@@ -35,7 +29,5 @@ is $svc->{perlbrew}, 'perl-5.42.1',    'perl from manifest';
 is $svc->{port},     9400,             'port from manifest live target';
 is $svc->{host},     'demo.do',        'host from manifest live target';
 is $svc->{health},   '/health',        'health from manifest';
-is_deeply $svc->{env_required}, { API_KEY => 'upstream API' };
-is $svc->{env_optional}{LOG_LEVEL}{default}, 'info';
 
 done_testing;

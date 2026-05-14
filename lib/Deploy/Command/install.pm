@@ -328,18 +328,6 @@ dev:
 #     port: 8080
 #     runner: hypnotoad
 
-# === Environment Variables ===
-
-# Variables the app requires to start (deploy blocked if missing)
-# env_required:
-#   DATABASE_URL: "Postgres connection string"
-#   SECRET_KEY: "Session signing key"
-
-# Variables with sensible defaults (optional to set)
-# env_optional:
-#   LOG_LEVEL:
-#     default: info
-#     desc: "debug | info | warn | error"
 YAML
 
     require Path::Tiny;

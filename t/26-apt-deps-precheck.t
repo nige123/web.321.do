@@ -8,7 +8,6 @@ use Mojo::Log;
 
 my $home = tempdir(CLEANUP => 1);
 path($home, 'services')->mkpath;
-path($home, 'secrets')->mkpath;
 my $repo = tempdir(CLEANUP => 1);
 
 my $svc_mgr = Deploy::Service->new(

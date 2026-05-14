@@ -5,11 +5,10 @@ use YAML::XS qw(LoadFile);
 use Path::Tiny qw(path);
 
 my %VALID_RUNNER = map { $_ => 1 } qw(hypnotoad morbo script);
-my $ENV_KEY_RE   = qr/^[A-Z_][A-Z0-9_]*$/;
 
 my %IDENTITY_KEY = map { $_ => 1 } qw(
     name entry runner perl health branch repo test
-    env_required env_optional apt_deps favicon workers force_https
+    apt_deps favicon workers force_https
 );
 
 sub load ($class, $repo_dir) {
@@ -26,13 +25,6 @@ sub load ($class, $repo_dir) {
     die "Manifest $file: unknown runner '$raw->{runner}'\n"
         unless $VALID_RUNNER{ $raw->{runner} };
 
-    my %required = %{ $raw->{env_required} // {} };
-    my %optional = %{ $raw->{env_optional} // {} };
-
-    for my $k (keys %required, keys %optional) {
-        die "Manifest $file: invalid env key '$k'\n" unless $k =~ $ENV_KEY_RE;
-    }
-
     my %targets;
     for my $k (keys %$raw) {
         next if $IDENTITY_KEY{$k};
@@ -47,8 +39,6 @@ sub load ($class, $repo_dir) {
         perl         => $raw->{perl},
         health       => $raw->{health} // '/health',
         branch       => $raw->{branch} // 'master',
-        env_required => \%required,
-        env_optional => \%optional,
         apt_deps     => $raw->{apt_deps} // [],
         targets      => \%targets,
         repo         => "$repo_dir",

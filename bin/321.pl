@@ -1135,21 +1135,8 @@ body::after {
 .badge { display:inline-block; padding:2px 6px; border-radius:3px; font-size:11px; margin-left:6px; vertical-align:middle; }
 .badge-ok   { background:var(--accent); color:var(--bg); }
 .badge-warn { background:#c33; color:#fff; }
-.secrets-heading { font-size: 12px; margin: 8px 0 4px; color: var(--accent); }
-.secrets-list { display: flex; flex-direction: column; gap: 4px; }
-.secret-row { display: flex; align-items: center; gap: 6px; padding: 4px 0; font-size: 12px; flex-wrap: wrap; }
-.secret-key { font-weight: 600; min-width: 120px; }
-.secret-status { font-size: 10px; padding: 1px 5px; border-radius: 2px; }
-.secret-status.set { background: var(--accent); color: var(--bg); }
-.secret-status.missing { background: #c33; color: #fff; }
-.secret-status.default { opacity: 0.5; }
-.secret-hint { font-size: 10px; opacity: 0.6; }
-.secret-input { background: var(--surface); border: 1px solid var(--border); color: var(--fg); padding: 3px 6px; font-size: 11px; width: 140px; border-radius: 3px; }
 .btn-sm { font-size: 10px; padding: 3px 8px; }
 .btn-danger { color: #c33; }
-.secrets-optional { margin-top: 8px; }
-.secrets-optional summary { cursor: pointer; font-size: 11px; opacity: 0.7; }
-.secrets-none { font-size: 11px; opacity: 0.5; padding: 8px 0; }
 
 .deploy-step { margin: 4px 0; }
 .deploy-step > summary {
@@ -1517,10 +1504,6 @@ body::after {
 .config-input:focus {
     border-color: var(--phosphor-dim);
     color: var(--phosphor);
-}
-
-.config-input.secret {
-    color: var(--amber);
 }
 
 .btn-save-dirty {
@@ -2168,11 +2151,10 @@ async function loadServices() {
         const deployLabel = isDev ? 'DEPLOY DEV' : 'DEPLOY';
         const faviconUrl = svc.favicon || (svc.host && svc.host !== 'localhost' ? 'https://' + svc.host + '/favicon.ico' : '');
         const faviconImg = faviconUrl ? '<img class="svc-favicon" src="' + esc(faviconUrl) + '" alt="" onerror="this.style.display=\'none\'">' : '';
-        const secretsBadge = (() => { const sec = svc.secrets; if (!sec || sec.required === 0) return ''; const ok = sec.present === sec.required; return '<span class="badge ' + (ok ? 'badge-ok' : 'badge-warn') + '">secrets: ' + sec.present + '/' + sec.required + '</span>'; })();
         card.innerHTML = `
             <div class="svc-header">
                 <div class="svc-name">${faviconImg}<a href="/ui/service/${svc.name}">${svc.name}</a></div>
-                <div class="svc-header-right">${secretsBadge}<div class="status-led ${running ? 'on' : 'off'}"></div></div>
+                <div class="svc-header-right"><div class="status-led ${running ? 'on' : 'off'}"></div></div>
             </div>
             <dl class="svc-meta">
                 <dt>PORT</dt><dd>${svc.port || '\u2014'}</dd>
@@ -2300,10 +2282,6 @@ setInterval(loadServices, 30000);
                     <svg class="btn-icon" viewBox="0 0 16 16"><polygon points="4,2 4,14 14,8"/></svg> DEPLOY
                 </button>
             </div>
-            <div class="secrets-panel" id="secrets-panel" style="display:none">
-                <div class="section-title" style="margin-top:16px">SECRETS</div>
-                <div id="secrets-content"></div>
-            </div>
         </div>
     </div>
 
@@ -2401,85 +2379,6 @@ async function loadStatus() {
     } else {
         visit.style.display = 'none';
     }
-    loadSecrets();
-}
-
-async function loadSecrets() {
-    try {
-        const d = await api('/service/' + SVC + '/secrets');
-        if (d.status !== 'success') return;
-        const panel = document.getElementById('secrets-panel');
-        const content = document.getElementById('secrets-content');
-        panel.style.display = '';
-        let html = '';
-        if (d.data.required && d.data.required.length > 0) {
-            html += '<h3 class="secrets-heading">Required</h3><div class="secrets-list">';
-            for (const key of d.data.required) {
-                const isSet = d.data.present.includes(key);
-                html += '<div class="secret-row" data-key="' + esc(key) + '">'
-                    + '<span class="secret-key">' + esc(key) + '</span>'
-                    + '<span class="secret-status ' + (isSet ? 'set' : 'missing') + '">' + (isSet ? 'SET' : 'MISSING') + '</span>'
-                    + '<input type="password" class="secret-input" placeholder="' + (isSet ? '(keep existing)' : 'set value') + '" autocomplete="off">'
-                    + '<button class="btn btn-sm" onclick="setSecret(\'' + esc(key) + '\', this)">Save</button>'
-                    + (isSet ? '<button class="btn btn-sm btn-danger" onclick="deleteSecret(\'' + esc(key) + '\')">Del</button>' : '')
-                    + '</div>';
-            }
-            html += '</div>';
-        }
-        const optKeys = Object.keys(d.data.optional || {});
-        if (optKeys.length > 0) {
-            html += '<details class="secrets-optional"><summary>Optional (' + optKeys.length + ')</summary><div class="secrets-list">';
-            for (const key of optKeys.sort()) {
-                const spec = d.data.optional[key] || {};
-                const isSet = (d.data.optional_set || []).includes(key);
-                const hint = spec.desc ? esc(spec.desc) : '';
-                const def = spec['default'] ? ' (default: ' + esc(spec['default']) + ')' : '';
-                html += '<div class="secret-row" data-key="' + esc(key) + '">'
-                    + '<span class="secret-key">' + esc(key) + '</span>'
-                    + '<span class="secret-hint">' + hint + def + '</span>'
-                    + '<span class="secret-status ' + (isSet ? 'set' : 'default') + '">' + (isSet ? 'SET' : 'default') + '</span>'
-                    + '<input type="password" class="secret-input" placeholder="' + (isSet ? '(keep existing)' : 'set value') + '" autocomplete="off">'
-                    + '<button class="btn btn-sm" onclick="setSecret(\'' + esc(key) + '\', this)">Save</button>'
-                    + (isSet ? '<button class="btn btn-sm btn-danger" onclick="deleteSecret(\'' + esc(key) + '\')">Del</button>' : '')
-                    + '</div>';
-            }
-            html += '</div></details>';
-        }
-        if (!html) html = '<div class="secrets-none">No env keys declared in manifest.</div>';
-        content.innerHTML = html;
-    } catch(e) { /* silently ignore */ }
-}
-
-async function setSecret(key, btn) {
-    const row = btn.closest('.secret-row');
-    const input = row.querySelector('.secret-input');
-    const value = input.value;
-    if (!value) return;
-    btn.disabled = true;
-    try {
-        const d = await api('/service/' + SVC + '/secrets', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({key: key, value: value})
-        });
-        if (d.status === 'success') { toast(key + ' saved'); loadSecrets(); }
-        else { toast(d.message || 'Failed', 'error'); }
-    } catch(e) { toast('Error: ' + e.message, 'error'); }
-    btn.disabled = false;
-    input.value = '';
-}
-
-async function deleteSecret(key) {
-    if (!confirm('Delete ' + key + '?')) return;
-    try {
-        const d = await api('/service/' + SVC + '/secrets/delete', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({key: key})
-        });
-        if (d.status === 'success') { toast(key + ' deleted'); loadSecrets(); }
-        else { toast(d.message || 'Failed', 'error'); }
-    } catch(e) { toast('Error: ' + e.message, 'error'); }
 }
 
 let lastDeploySteps = null;
@@ -2768,7 +2667,7 @@ function renderConfigFields(targetName) {
     html += '<div class="config-section-label">ENVIRONMENT</div>';
     const env = t.env || {};
     Object.entries(env).forEach(([k, v]) => {
-        html += configRow(k, 'cfg-env-' + k, v, true);
+        html += configRow(k, 'cfg-env-' + k, v);
     });
     html += '<div class="config-row"><span class="config-label"></span><button class="btn" onclick="addEnvVar()" style="font-size: 13px">+ ADD VAR</button></div>';
 
@@ -2783,9 +2682,8 @@ function markConfigDirty() {
     if (btn) btn.className = 'btn btn-save-dirty';
 }
 
-function configRow(label, id, value, isSecret) {
-    const cls = isSecret ? 'config-input secret' : 'config-input';
-    return '<div class="config-row"><span class="config-label">' + label + '</span><input class="' + cls + '" id="' + id + '" value="' + escHtml(String(value)) + '" data-field="' + label + '"></div>';
+function configRow(label, id, value) {
+    return '<div class="config-row"><span class="config-label">' + label + '</span><input class="config-input" id="' + id + '" value="' + escHtml(String(value)) + '" data-field="' + label + '"></div>';
 }
 
 function addEnvVar() {
@@ -2796,7 +2694,7 @@ function addEnvVar() {
     row.className = 'config-row';
     row.id = 'new-env-row';
     row.innerHTML = '<input class="config-input" id="new-env-key" placeholder="VAR_NAME" style="max-width:120px">' +
-        '<input class="config-input secret" id="new-env-val" placeholder="value">';
+        '<input class="config-input" id="new-env-val" placeholder="value">';
     fields.insertBefore(row, fields.lastElementChild);
     const keyInput = document.getElementById('new-env-key');
     keyInput.focus();
@@ -2829,9 +2727,9 @@ async function saveConfig() {
     if (docs) t.docs = docs; else delete t.docs;
     if (admin) t.admin = admin; else delete t.admin;
 
-    // Read env vars
+    // Read env vars (any input whose id starts with cfg-env-)
     const env = {};
-    document.querySelectorAll('.config-input.secret').forEach(input => {
+    document.querySelectorAll('input[id^="cfg-env-"]').forEach(input => {
         const key = input.dataset.field;
         if (key) env[key] = input.value;
     });
@@ -3098,7 +2996,6 @@ runner: hypnotoad</pre>
                         <pre class="add-code">321 install pizza.web</pre>
                         Clones the repo, installs deps, sets up ubic + nginx + SSL, starts the service.
                     </li>
-                    <li><strong>Set secrets</strong> if the manifest declares <code>env_required</code> &mdash; use the secrets panel on the service page.</li>
                     <li><strong>Check the dashboard</strong> &mdash; green LED means it&rsquo;s running.</li>
                 </ol>
             </div>

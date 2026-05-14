@@ -6,7 +6,6 @@ use Deploy::Config;
 use Deploy::Ubic;
 
 my $home_obj = tempdir(CLEANUP => 1);
-path($home_obj, 'secrets')->mkpath;
 my $scan_obj = tempdir(CLEANUP => 1);
 
 my $repo = path($scan_obj, 'web.demo.do');

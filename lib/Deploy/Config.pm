@@ -97,8 +97,6 @@ sub _resolve ($self, $name, $manifest) {
         host         => $target->{host} // 'localhost',
         apt_deps     => $manifest->{apt_deps} // [],
         health       => $manifest->{health} // '/health',
-        env_required => $manifest->{env_required} // {},
-        env_optional => $manifest->{env_optional} // {},
         logs         => {
             stdout => "/tmp/$name.stdout.log",
             stderr => "/tmp/$name.stderr.log",
@@ -123,21 +121,6 @@ sub service_names ($self) {
 
 sub service_raw ($self, $name) {
     return $self->_services->{$name};
-}
-
-sub load_secrets ($self, $name) {
-    my $env_file = path($self->app_home, 'secrets', "$name.env");
-    return {} unless $env_file->exists;
-
-    my %env;
-    for my $line ($env_file->lines_utf8({ chomp => 1 })) {
-        next if $line =~ /^\s*#/;
-        next if $line =~ /^\s*$/;
-        if ($line =~ /^([A-Za-z_][A-Za-z0-9_]*)=(.*)$/) {
-            $env{$1} = $2;
-        }
-    }
-    return \%env;
 }
 
 sub dev_hostnames ($self) {

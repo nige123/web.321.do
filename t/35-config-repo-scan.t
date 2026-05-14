@@ -23,8 +23,6 @@ live:
     host: alpha.do
     port: 9100
     runner: hypnotoad
-env_required:
-    API_KEY: "required"
 YAML
 
 my $repo_b = path($base, 'api.beta.do');
@@ -42,7 +40,6 @@ YAML
 path($base, 'no-manifest')->mkpath;
 
 my $home = tempdir(CLEANUP => 1);
-path($home, 'secrets')->mkpath;
 
 my $c = Deploy::Config->new(app_home => $home, scan_dir => "$base", target => 'dev');
 
@@ -77,11 +74,6 @@ subtest 'conventional log paths' => sub {
     is $svc->{logs}{stdout}, '/tmp/alpha.web.stdout.log';
     is $svc->{logs}{stderr}, '/tmp/alpha.web.stderr.log';
     is $svc->{logs}{ubic},   '/tmp/alpha.web.ubic.log';
-};
-
-subtest 'env_required from manifest' => sub {
-    my $svc = $c->service('alpha.web');
-    is $svc->{env_required}{API_KEY}, 'required';
 };
 
 subtest 'service without live target falls back' => sub {

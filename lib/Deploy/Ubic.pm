@@ -134,7 +134,6 @@ sub _build_bin_cmd ($self, $name, $svc) {
 
     my $home          = $self->_home;
     my $perlbrew_root = $self->_perlbrew_root;
-    my $app_home      = $self->config->app_home;
 
     # Env vars from target config
     my $env = $svc->{env} // {};
@@ -164,17 +163,13 @@ sub _build_bin_cmd ($self, $name, $svc) {
         ) . ' ';
     }
 
-    # Source secrets from env file at runtime (never baked into the ubic file)
-    my $secrets_path = "$app_home/secrets/$name.env";
-    my $source_secrets = "test -f $secrets_path && { set -a && . $secrets_path && set +a; }; ";
-
     # hypnotoad -f keeps the process foreground; ubic SimpleDaemon requires that.
     # Workers (runner=script) have no port — only build the tail we actually use.
     my $cmd
         = $runner eq 'script' ? "perl $bin"
         : $runner eq 'morbo'  ? "morbo -l http://127.0.0.1:$port $bin"
         :                       "hypnotoad -f $bin";
-    return "bash -c '${source_secrets}perlbrew exec --with $perlbrew ${env_str}$cmd'";
+    return "perlbrew exec --with $perlbrew ${env_str}$cmd";
 }
 
 # Parse `ubic status` output into { name => { pid, raw } }.

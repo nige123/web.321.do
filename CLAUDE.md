@@ -12,8 +12,8 @@ Runs on both the dev machine (`dev.321.do`) and production (`321.do`). The same 
 - **Framework:** Mojolicious::Lite
 - **Service controller:** UBIC (wrapping Hypnotoad for hot-restart zero-downtime deploys, or Morbo for dev)
 - **Web server:** nginx (config managed by 321; SSL via letsencrypt/certbot on live, mkcert on dev — see Dev parity)
-- **Config:** Per-service YAML files under `services/`, encrypted with SOPS (age recipients). Legacy flat `services.yml` is still read as a fallback.
-- **Secrets:** `secrets/<name>.env` files (shell-style `KEY=value`) loaded into the ubic wrapper env; sensitive fields in `services/*.yml` are SOPS-encrypted (the `env` regex).
+- **Config:** A `321.yml` manifest at the root of every service repo. 321 scans sibling directories under `/home/s3` for these. Legacy flat `services.yml` is still read as a fallback.
+- **Secrets:** **not 321's job** — each service repo handles its own secrets via its own config files / env loading. 321 only passes through whatever non-sensitive env vars are declared per-target in `321.yml` (`env:`).
 - **No database** — stateless, config-driven.
 
 ## Architecture
@@ -22,7 +22,7 @@ Single lightweight daemon on port **9321**. Entry point is `bin/321.pl` (Mojolic
 
 Core modules (`lib/Deploy/`):
 
-- `Config.pm` — loads/saves per-service YAML, handles SOPS decrypt/encrypt, resolves the active target (`dev`/`live`), exposes `load_secrets`.
+- `Config.pm` — loads per-repo `321.yml` manifests, resolves the active target (`dev`/`live`) into a flat service descriptor.
 - `Service.pm` — `status`, `deploy` (git + cpanm + ubic restart + port check), `deploy_dev` (no git pull), log writes under `/tmp/321.do/deploys/`.
 - `Ubic.pm` — generates `ubic/service/<group>/<name>` files from config and installs symlinks under `~/ubic/service/<group>/<name>`. Builds the `perlbrew exec --with … env KEY=VAL hypnotoad -f …` (or `morbo`) command line.
 - `Nginx.pm` — renders `/etc/nginx/sites-available/<host>` (HTTP + optional SSL), enables the site, runs `nginx -t` + `systemctl reload nginx`. Delegates cert paths and acquisition commands to `CertProvider`.
@@ -58,7 +58,7 @@ GET  /service/:name/logs              — tail logs (?type=stdout|stderr|ubic&n=
 GET  /service/:name/logs/search       — search logs (?q=…&type=…&n=50, max n=500)
 GET  /service/:name/logs/analyse      — error/warning aggregation (?n=1000, max n=10000)
 
-GET  /service/:name/config            — raw decrypted service YAML
+GET  /service/:name/config            — raw service YAML
 POST /service/:name/config            — update config (JSON body) + git commit
 POST /services/create                 — create service (JSON body, requires `name`) + git commit + ubic generate
 POST /service/:name/delete            — delete service + git commit
@@ -115,7 +115,7 @@ Prod never needs mkcert; dev never needs certbot. Both still use the same `Deplo
 
 ## Service Repo Contract
 
-Every service repo installed by 321 must ship a `.321.yml` at the repo root. It declares code-side facts — things that belong with the application, not in the deploy repo.
+Every service repo installed by 321 must ship a `321.yml` at the repo root. It declares everything 321 needs to clone, build, run, and serve the app — identity, runner, target-specific host/port, and any apt deps.
 
 ```yaml
 name: love.web              # <group>.<name>
@@ -123,17 +123,28 @@ entry: bin/love.pl
 runner: hypnotoad           # hypnotoad | morbo | script
 perl: perl-5.42.1           # optional; perlbrew version
 health: /health             # optional; post-deploy probe path
-env_required:               # keys the app cannot start without
-  DATABASE_URL: "Postgres DSN"
-env_optional:               # keys with sensible defaults or only-sometimes-needed
-  LOG_LEVEL:
-    default: info
-    desc: "debug | info | warn"
+branch: main                # optional; defaults to master
+repo: git@github.com:you/love.honeywillow.com.git
+apt_deps:                   # optional; sudo apt-get install before cpanm
+  - libfreetype-dev
+
+dev:
+    host: love.honeywillow.com.dev
+    port: 8888
+    runner: morbo
+live:
+    host: love.honeywillow.com
+    port: 8888
+    runner: hypnotoad
+    ssh: ubuntu@zorda.co
+    ssh_key: ~/.ssh/kaizen-nige.pem
+    env:                    # plain (non-secret) overrides only
+        MOJO_MODE: production
 ```
 
-The deploy repo (`services/<name>.yml`) only owns deploy-side facts: repo URL, branch, per-target `host`/`port`/`ssl`/`env`, `apt_deps`, and any operator overrides. When a deploy YAML sets a field that also exists in the manifest (e.g. `bin:`), the deploy-side value wins (operator override).
+**Secrets are the service repo's responsibility, not 321's.** Each app loads its own secrets however it wants (its own config file, an environment loader at startup, etc.). 321 only passes through whatever non-sensitive env vars the target block declares under `env:`.
 
-The 321 dashboard compares `env_required` against `secrets/<name>.env` and refuses to deploy or start a service with any missing required key. Secrets are managed via the dashboard UI or the `/service/:name/secrets` API.
+If a target's hypnotoad runner needs to listen on a specific port, the app's production config must set `hypnotoad => { listen => ['http://*:PORT'] }` to match the manifest port — 321 can't pass it on the command line. A mismatch shows up as a `port_check` failure with the actual bound port in the hint.
 
 ## Development
 
