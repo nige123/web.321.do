@@ -46,6 +46,10 @@ sub run ($self, @args) {
     if ($needs_install) {
         my $install = Deploy::Command::install->new(app => $self->app);
         $install->run($name, $target);
+        # install handles nginx + SSL itself, but not /etc/hosts on dev —
+        # _ensure_serving picks up that gap (and no-ops on the bits install
+        # already did).
+        $self->_ensure_serving($name, $target, $transport);
         return;
     }
 
