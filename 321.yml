@@ -14,7 +14,7 @@ branch: master                 # git branch to deploy from
 test: prove -lr t              # run before deploying to live
 
 # Favicon shown on the 321 dashboard (optional)
-# favicon: https://321.do/favicon.ico
+favicon: https://321.do/favicon.ico
 
 # System packages needed before cpanm (optional)
 # apt_deps:
@@ -31,13 +31,5 @@ live:
     host: 321.do
     port: 9321
     runner: hypnotoad
-    ssh: ubuntu@ec2-34-248-234-254.eu-west-1.compute.amazonaws.com
+    ssh: ubuntu@zorda.co
     ssh_key: ~/.ssh/kaizen-nige.pem
-
-# Environment variables the app needs
-env_required:
-    MOJO_MODE: "production or development"
-
-env_optional:
-    DEPLOY_TOKEN:
-        desc: "Token for remote deploy endpoint"
