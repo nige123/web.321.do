@@ -237,4 +237,34 @@ sub print_failure ($self, $transport, $name, $target, $message = undef) {
     }
 }
 
+# Run "ubic <action> <worker>" on the given transport for every worker
+# belonging to the main service $name. For 'stop', the worker list is
+# reversed so workers settle before the main. Returns an arrayref of
+# { name, ok, output } rows — one per worker step. A per-worker failure
+# is recorded; the loop keeps going.
+sub cascade_workers ($self, $name, $action, $transport) {
+    my $workers = $self->config->workers_of($name);
+    return [] unless @$workers;
+    my @order = $action eq 'stop' ? reverse @$workers : @$workers;
+    my @results;
+    for my $w (@order) {
+        my $r = $transport->run("ubic $action $w");
+        push @results, {
+            name   => $w,
+            ok     => $r->{ok} ? 1 : 0,
+            output => $r->{output} // '',
+        };
+    }
+    return \@results;
+}
+
+# Pretty-print one cascade result row to STDOUT (used by lifecycle subcommands).
+sub print_worker_step ($self, $action, $row) {
+    if ($row->{ok}) {
+        printf "  [OK] worker %s %sed\n", $row->{name}, $action;
+    } else {
+        printf "  [FAIL] worker %s %s — %s\n", $row->{name}, $action, $row->{output};
+    }
+}
+
 1;
