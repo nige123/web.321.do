@@ -3,7 +3,6 @@ use warnings;
 use Test::More;
 use Path::Tiny qw(tempdir path);
 use Deploy::Config;
-use Mojo::Log;
 
 # Fixture: a scan_dir containing one repo whose 321.yml declares two workers
 # (printer, mailer) plus a no-workers control repo. Returns the scan_dir path
