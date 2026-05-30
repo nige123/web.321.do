@@ -156,4 +156,57 @@ subtest 'cascade_workers is a no-op when target has no workers' => sub {
     is_deeply $results, [], 'empty result list';
 };
 
+# Stubbed stop subclass that swaps in a recording transport and skips
+# the status command at the end of stop.pm (status would re-instantiate
+# its own transport_for and we want to assert on the one we injected).
+BEGIN { require Deploy::Command::stop }
+package TestStop {
+    use parent -norequire, 'Deploy::Command::stop';
+    our $TRANSPORT;
+    sub transport_for { $TRANSPORT }
+    # Skip the trailing status block; it constructs a real Mojolicious
+    # status command which isn't what these tests are about.
+    sub _show_status { }
+}
+
+subtest 'stop demo.web stops workers in reverse, then main' => sub {
+    my ($home, $scan, $scan_obj, $home_obj) = make_fixture();
+    my $cfg = Deploy::Config->new(app_home => $home, scan_dir => $scan, target => 'live');
+    my $t = RecordingTransport->new;
+    local $TestStop::TRANSPORT = $t;
+    my $app = make_app($cfg);
+    my $cmd = TestStop->new(app => $app);
+    $cmd->run('demo.web', 'live');
+    is_deeply [$t->calls],
+        ['ubic stop demo.printer', 'ubic stop demo.mailer', 'ubic stop demo.web'],
+        'workers stop reverse-sorted, then main';
+};
+
+subtest 'stop demo.printer (worker target) does not cascade' => sub {
+    my ($home, $scan, $scan_obj, $home_obj) = make_fixture();
+    my $cfg = Deploy::Config->new(app_home => $home, scan_dir => $scan, target => 'live');
+    my $t = RecordingTransport->new;
+    local $TestStop::TRANSPORT = $t;
+    my $app = make_app($cfg);
+    my $cmd = TestStop->new(app => $app);
+    $cmd->run('demo.printer', 'live');
+    is_deeply [$t->calls], ['ubic stop demo.printer'],
+        'naming a worker stops only that worker';
+};
+
+subtest 'stop continues to main even when a worker stop fails' => sub {
+    my ($home, $scan, $scan_obj, $home_obj) = make_fixture();
+    my $cfg = Deploy::Config->new(app_home => $home, scan_dir => $scan, target => 'live');
+    my $t = RecordingTransport->new(replies => {
+        'ubic stop demo.printer' => { ok => 0, output => 'boom' },
+    });
+    local $TestStop::TRANSPORT = $t;
+    my $app = make_app($cfg);
+    my $cmd = TestStop->new(app => $app);
+    $cmd->run('demo.web', 'live');
+    is_deeply [$t->calls],
+        ['ubic stop demo.printer', 'ubic stop demo.mailer', 'ubic stop demo.web'],
+        'failed worker does not abort cascade or main';
+};
+
 done_testing;

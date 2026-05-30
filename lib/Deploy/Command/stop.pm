@@ -13,6 +13,14 @@ sub run ($self, @args) {
 
     for my $name (@names) {
         my $transport = $self->transport_for($name, $target);
+
+        # Stop workers first (reverse sorted) so they settle before the main
+        # process exits. No-op when $name resolves to a worker or to a main
+        # with no workers — cascade_workers returns [] in those cases.
+        for my $row (@{ $self->cascade_workers($name, 'stop', $transport) }) {
+            $self->print_worker_step('stop', $row);
+        }
+
         my $r = $transport->run("ubic stop $name");
         if ($r->{ok}) {
             say "  $name stopped ($target)";
@@ -21,7 +29,10 @@ sub run ($self, @args) {
         }
     }
 
-    # Show status
+    $self->_show_status($svc_input, $target);
+}
+
+sub _show_status ($self, $svc_input, $target) {
     say "";
     require Deploy::Command::status;
     Deploy::Command::status->new(app => $self->app)->run($svc_input, $target);
@@ -32,5 +43,9 @@ sub run ($self, @args) {
 =head1 SYNOPSIS
 
   Usage: APPLICATION stop <service>
+
+  Stops the named service. When the name is a main service with workers
+  declared in its 321.yml, workers are stopped first (reverse sorted),
+  then the main. Naming a worker directly stops only that worker.
 
 =cut
