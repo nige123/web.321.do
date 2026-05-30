@@ -115,7 +115,7 @@ Tests:
 1. **Config method**: `Config->workers_of('demo.web')` returns `['demo.printer']`; `workers_of('demo.printer')` returns `[]`; `workers_of('demo.web')` on a manifest with no `workers:` returns `[]`.
 2. **Start cascade**: A `TestStart` subclass records each `ubic start` call. `321 start demo.web` records starts for `demo.web` then `demo.printer`.
 3. **Start worker-only**: `321 start demo.printer` records a start for `demo.printer` and *not* `demo.web`.
-4. **Stop cascade reverse order**: With two workers in the fixture (`printer` and `mailer`), `321 stop demo.web` records stops for `demo.mailer`, then `demo.printer`, then `demo.web`.
+4. **Stop cascade reverse order**: With two workers in the fixture (`printer` and `mailer`), `321 stop demo.web` records stops for `demo.printer`, then `demo.mailer`, then `demo.web`. (Sorted = `[mailer, printer]`; stop iterates the reverse of that, then stops main.)
 5. **Main failure short-circuits**: A `TestStart` that makes the main fail to come up does *not* record any worker starts.
 6. **Worker failure does not abort cascade**: With two workers, if the first worker stop fails, the second worker stop and the main stop still run.
 
