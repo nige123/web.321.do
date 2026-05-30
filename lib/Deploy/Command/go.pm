@@ -63,6 +63,15 @@ sub run ($self, @args) {
     say "  $r->{message}" if $r->{message};
 
     $self->_ensure_serving($name, $target, $transport);
+
+    # Workers share the repo we just deployed; just bounce them so they
+    # pick up new code. Gate on main deploy success — no point bouncing
+    # workers if the main step bailed.
+    if (($r->{status} // '') ne 'error') {
+        for my $row (@{ $self->cascade_workers($name, 'restart', $transport) }) {
+            $self->print_worker_step('restart', $row);
+        }
+    }
 }
 
 # A plain `321 go` should leave the service actually reachable — not just the
