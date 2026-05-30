@@ -39,6 +39,14 @@ Each service YAML has `targets: { dev: {…}, live: {…} }` with per-target `ho
 
 Service names are `<group>.<name>` (e.g. `321.web`, `123.api`). The group/name split drives the ubic symlink layout: `~/ubic/service/<group>/<name>` → `<repo>/ubic/service/<group>/<name>`.
 
+### Workers and the lifecycle cascade
+
+Services declared under a parent's `workers:` block in `321.yml` are expanded into independent ubic services named `<group>.<workerName>` (a minion worker on `123.api` becomes the ubic service `123.minion`). They share the parent's repo, perl version, and target config, but they have their own pid, logs, and ubic file.
+
+`321 go`, `321 start`, `321 stop`, and `321 restart` treat the parent and its workers as one unit when the *parent* is named. The parent runs first on start/go/restart; workers are restarted after in sorted name order. Stop iterates in reverse — workers first, parent last — so jobs settle before the connection they depend on goes away. Naming a worker directly (`321 restart 123.minion`) acts only on that worker, so a stuck worker can be cycled without disturbing the web tier.
+
+Per-worker failures are reported but don't abort the cascade or the main step. A failed main step skips the worker pass — there is nothing useful to cascade to.
+
 ### Endpoints
 
 ```
