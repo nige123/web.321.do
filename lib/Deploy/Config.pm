@@ -119,6 +119,16 @@ sub service_names ($self) {
     return [ sort keys %{ $self->_services } ];
 }
 
+sub workers_of ($self, $name) {
+    $self->_check_reload;
+    my $manifest = $self->_services->{$name};
+    return [] unless $manifest;
+    return [] if exists $manifest->{_parent};   # this entry is a worker, not a main
+    my $workers = $manifest->{workers} // {};
+    my ($group) = split /\./, $name, 2;
+    return [ map { "$group.$_" } sort keys %$workers ];
+}
+
 sub service_raw ($self, $name) {
     return $self->_services->{$name};
 }
