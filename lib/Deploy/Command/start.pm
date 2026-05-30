@@ -12,54 +12,71 @@ sub run ($self, @args) {
     $self->config->target($target);
 
     for my $name (@names) {
-        $self->_start_one($name, $target);
+        my $transport = $self->transport_for($name, $target);
+        my $up = $self->_start_one($name, $target, $transport);
+
+        # Cascade worker starts only when the main service ended up running.
+        # No-op when $name is a worker or has no workers.
+        if ($up) {
+            for my $w (@{ $self->config->workers_of($name) }) {
+                $self->_start_one($w, $target, $transport);
+            }
+        }
     }
 
-    # Show status
+    $self->_show_status($svc_input, $target);
+}
+
+sub _show_status ($self, $svc_input, $target) {
     say "";
     require Deploy::Command::status;
     Deploy::Command::status->new(app => $self->app)->run($svc_input, $target);
 }
 
-sub _start_one ($self, $name, $target) {
-    my $transport = $self->transport_for($name, $target);
+# Start one service. Returns 1 if the service ended up running (already
+# running OR a fresh start succeeded and the port responded). Returns 0
+# otherwise. Workers have no port; treat them as up if ubic reports running.
+sub _start_one ($self, $name, $target, $transport) {
+    $transport //= $self->transport_for($name, $target);
     $self->ensure_fresh_ubic($name, $transport);
     my $svc  = $self->config->service($name);
     my $port = $svc->{port} // '?';
     my $url  = $self->service_url($svc);
 
-    # Already running?
     my $status = $transport->run("ubic status $name 2>&1");
     if ($status->{ok} && $status->{output} =~ /running \(pid (\d+)\)/) {
         say "  \e[32m$name is already running\e[0m  pid:$1  port:$port  $url";
-        return;
+        return 1;
     }
 
-    # Check if port is taken by something else
     if ($port && $port ne '?' && $self->check_port($port, $transport)) {
         my $who = $transport->run("ss -tlnp | grep ':$port '");
         say "  \e[31m$name: port $port is already in use\e[0m";
         say "  $who->{output}" if $who->{output} && $who->{output} =~ /\S/;
-        return;
+        return 0;
     }
 
     my $r = $transport->run("ubic start $name");
 
     if ($r->{output} && $r->{output} =~ /not found|unknown service/i) {
         say "  \e[31m$name is not installed\e[0m — run: 321 install $name" . $self->target_flag($target);
-        return;
+        return 0;
     }
 
     say "  $r->{output}" if $r->{output} && $r->{output} =~ /\S/;
 
     sleep 2;
-    my $port_ok = $self->check_port($port, $transport);
+    my $port_ok = ($svc->{is_worker} || !$port || $port eq '?')
+        ? 1
+        : $self->check_port($port, $transport);
 
     if ($port_ok) {
-        say "  \e[32m$name running\e[0m ($target)  port:$port  $url";
+        say "  \e[32m$name running\e[0m ($target)" . ($port ne '?' ? "  port:$port" : '') . "  $url";
+        return 1;
     } else {
         say "  \e[31m$name not running\e[0m after start";
         $self->print_failure($transport, $name, $target);
+        return 0;
     }
 }
 
@@ -68,5 +85,9 @@ sub _start_one ($self, $name, $target) {
 =head1 SYNOPSIS
 
   Usage: APPLICATION start <service>
+
+  Starts the named service. When the name is a main with workers
+  declared in 321.yml, every worker is started after the main comes
+  up. Naming a worker directly starts only that worker.
 
 =cut

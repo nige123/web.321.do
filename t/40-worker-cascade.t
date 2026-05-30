@@ -272,4 +272,78 @@ subtest 'restart demo.printer (worker target) does not cascade' => sub {
     is_deeply [$t->calls], [], 'worker name → cascade_workers returns []';
 };
 
+BEGIN { require Deploy::Command::start }
+
+package TestStart {
+    use parent -norequire, 'Deploy::Command::start';
+    our $TRANSPORT;
+    sub transport_for     { $TRANSPORT }
+    sub ensure_fresh_ubic { }
+    # Skip the trailing status command (it constructs its own command).
+    sub _show_status      { }
+}
+
+# Helper: a recording transport whose ubic status replies say "running",
+# so _start_one's "already running" branch fires for the main and workers
+# — which still records a 'ubic status' call we can assert on.
+sub start_transport_for_already_running {
+    return RecordingTransport->new(replies => {
+        'ubic status demo.web 2>&1'     => { ok => 1, output => "demo.web\trunning (pid 1234)\n" },
+        'ubic status demo.mailer 2>&1'  => { ok => 1, output => "demo.mailer\trunning (pid 1235)\n" },
+        'ubic status demo.printer 2>&1' => { ok => 1, output => "demo.printer\trunning (pid 1236)\n" },
+    });
+}
+
+subtest 'start demo.web cascades to workers in sorted order' => sub {
+    my ($home, $scan, $scan_obj, $home_obj) = make_fixture();
+    my $cfg = Deploy::Config->new(app_home => $home, scan_dir => $scan, target => 'live');
+    my $t = start_transport_for_already_running();
+    local $TestStart::TRANSPORT = $t;
+    my $app = make_app($cfg);
+    my $cmd = TestStart->new(app => $app);
+    $cmd->run('demo.web', 'live');
+    # Each _start_one runs `ubic status <name> 2>&1` first; if already
+    # running, it returns and doesn't call `ubic start`. So the recorded
+    # calls are three status checks: main, then workers sorted.
+    is_deeply [$t->calls],
+        [
+            'ubic status demo.web 2>&1',
+            'ubic status demo.mailer 2>&1',
+            'ubic status demo.printer 2>&1',
+        ],
+        'main then each worker — sorted';
+};
+
+subtest 'start demo.printer (worker target) does not cascade' => sub {
+    my ($home, $scan, $scan_obj, $home_obj) = make_fixture();
+    my $cfg = Deploy::Config->new(app_home => $home, scan_dir => $scan, target => 'live');
+    my $t = start_transport_for_already_running();
+    local $TestStart::TRANSPORT = $t;
+    my $app = make_app($cfg);
+    my $cmd = TestStart->new(app => $app);
+    $cmd->run('demo.printer', 'live');
+    is_deeply [$t->calls], ['ubic status demo.printer 2>&1'],
+        'worker target → only that worker is started';
+};
+
+subtest 'start demo.web skips worker cascade if main does not come up' => sub {
+    my ($home, $scan, $scan_obj, $home_obj) = make_fixture();
+    my $cfg = Deploy::Config->new(app_home => $home, scan_dir => $scan, target => 'live');
+    # Main status: not running; ubic start replies "unknown service" →
+    # _start_one returns 0 → cascade skipped. Make check_port fail (port
+    # not responding) so we land in the ubic start branch.
+    my $t = RecordingTransport->new(replies => {
+        'ubic status demo.web 2>&1' => { ok => 1, output => "demo.web\tnot running\n" },
+        'curl -s -o /dev/null --connect-timeout 2 http://127.0.0.1:39400/' => { ok => 0, output => '' },
+        'ubic start demo.web' => { ok => 1, output => 'unknown service demo.web' },
+    });
+    local $TestStart::TRANSPORT = $t;
+    my $app = make_app($cfg);
+    my $cmd = TestStart->new(app => $app);
+    $cmd->run('demo.web', 'live');
+    my @calls = $t->calls;
+    ok !(grep { /ubic status demo\.mailer/ } @calls),
+        'workers not touched when main fails to start';
+};
+
 done_testing;
