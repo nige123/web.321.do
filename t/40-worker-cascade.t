@@ -209,4 +209,67 @@ subtest 'stop continues to main even when a worker stop fails' => sub {
         'failed worker does not abort cascade or main';
 };
 
+BEGIN { require Deploy::Command::restart }
+
+# Stub restart subclass: swap transport, swap svc_mgr for one whose restart
+# returns a canned result so we can drive the cascade gate.
+package StubSvcMgr {
+    sub new { bless { result => $_[1] }, $_[0] }
+    sub transport { }
+    sub restart   { $_[0]->{result} }
+}
+
+package TestRestart {
+    use parent -norequire, 'Deploy::Command::restart';
+    our ($TRANSPORT, $SVC_MGR);
+    sub transport_for      { $TRANSPORT }
+    sub svc_mgr            { $SVC_MGR }
+    sub ensure_fresh_ubic  { }     # skip ubic file freshness check
+    sub print_failure      { }     # silence
+}
+
+subtest 'restart demo.web cascades after main success' => sub {
+    my ($home, $scan, $scan_obj, $home_obj) = make_fixture();
+    my $cfg = Deploy::Config->new(app_home => $home, scan_dir => $scan, target => 'live');
+    my $t = RecordingTransport->new;
+    local $TestRestart::TRANSPORT = $t;
+    local $TestRestart::SVC_MGR = StubSvcMgr->new({
+        status => 'success', message => 'restarted', data => { steps => [] },
+    });
+    my $app = make_app($cfg);
+    my $cmd = TestRestart->new(app => $app);
+    $cmd->run('demo.web', 'live');
+    is_deeply [$t->calls],
+        ['ubic restart demo.mailer', 'ubic restart demo.printer'],
+        'workers restart after main, sorted order';
+};
+
+subtest 'restart demo.web does not cascade when main restart errors' => sub {
+    my ($home, $scan, $scan_obj, $home_obj) = make_fixture();
+    my $cfg = Deploy::Config->new(app_home => $home, scan_dir => $scan, target => 'live');
+    my $t = RecordingTransport->new;
+    local $TestRestart::TRANSPORT = $t;
+    local $TestRestart::SVC_MGR = StubSvcMgr->new({
+        status => 'error', message => 'nope', data => { steps => [] },
+    });
+    my $app = make_app($cfg);
+    my $cmd = TestRestart->new(app => $app);
+    $cmd->run('demo.web', 'live');
+    is_deeply [$t->calls], [], 'main errored → cascade skipped';
+};
+
+subtest 'restart demo.printer (worker target) does not cascade' => sub {
+    my ($home, $scan, $scan_obj, $home_obj) = make_fixture();
+    my $cfg = Deploy::Config->new(app_home => $home, scan_dir => $scan, target => 'live');
+    my $t = RecordingTransport->new;
+    local $TestRestart::TRANSPORT = $t;
+    local $TestRestart::SVC_MGR = StubSvcMgr->new({
+        status => 'success', message => 'restarted', data => { steps => [] },
+    });
+    my $app = make_app($cfg);
+    my $cmd = TestRestart->new(app => $app);
+    $cmd->run('demo.printer', 'live');
+    is_deeply [$t->calls], [], 'worker name → cascade_workers returns []';
+};
+
 done_testing;
