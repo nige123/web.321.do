@@ -17,6 +17,8 @@ package TestService;
 use parent -norequire, 'Deploy::Service';
 sub _run_cmd  { return { ok => 1, output => 'stubbed', exit_code => 0 } }  # ubic restart always succeeds
 sub _check_port { return 1 }                     # port always up
+sub _wait_port_free { return 1 }                 # pretend the port drains instantly
+sub _sleep { }                                   # no real sleeps in tests
 # _run_in_dir is used for cpanm; let it run for real (tempdir repo, cpanfile present)
 
 package main;
@@ -200,7 +202,7 @@ subtest 'migrate: missing bin/migrate reports no-op' => sub {
     is scalar @{ $r->{data}{steps} }, 0,                 'no steps emitted';
 };
 
-subtest 'restart: runs ubic_restart then port_check' => sub {
+subtest 'restart: authoritative stop -> drain -> start -> port_check' => sub {
     my ($home, $repo, $scan, $scan_obj, $home_obj) = make_fixture();
     my $svc_mgr = TestService->new(
         config => Deploy::Config->new(app_home => $home, scan_dir => $scan, target => 'live'),
@@ -208,8 +210,8 @@ subtest 'restart: runs ubic_restart then port_check' => sub {
     );
     my $r = $svc_mgr->restart('demo.web');
     my @steps = map { $_->{step} } @{ $r->{data}{steps} };
-    is_deeply \@steps, [qw(ubic_restart port_check)],
-        'restart emits only ubic_restart + port_check';
+    is_deeply \@steps, [qw(ubic_stop port_drain ubic_start port_check)],
+        'restart stops, drains the port, then starts clean';
 };
 
 done_testing;

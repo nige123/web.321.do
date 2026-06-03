@@ -227,22 +227,54 @@ sub restart ($self, $name) {
     my $svc = $self->config->service($name);
     return { status => 'error', message => "Unknown service: $name" } unless $svc;
 
-    my @steps;
-
-    my $s = $self->_step_ubic_restart($name);
-    push @steps, $s;
-    return $self->_deploy_result($name, 'error', 'Ubic restart failed', \@steps)
-        unless $self->_ok($s);
-
+    # Workers have no port and no hypnotoad pidfile — a plain `ubic restart`
+    # in place is safe and keeps the cascade fast.
     if ($svc->{is_worker}) {
-        return $self->_deploy_result($name, 'success', "Restarted $name", \@steps);
+        my $s = $self->_step_ubic_restart($name);
+        return $self->_deploy_result(
+            $name,
+            $self->_ok($s) ? 'success' : 'error',
+            $self->_ok($s) ? "Restarted $name" : 'Ubic restart failed',
+            [$s],
+        );
     }
 
-    sleep 2;
-    $s = $self->_step_port_check($svc);
-    push @steps, $s;
+    # Authoritative restart, NOT a bare `ubic restart` (= stop+start with no
+    # coordination). A bare start races the still-draining old manager:
+    # `hypnotoad -f` finds the previous bin/hypnotoad.pid alive, sends it
+    # USR2 (hot deploy) and exits — so the PID never changes ("phantom
+    # restart"), or the port is still bound ("Address already in use").
+    # Stop, wait for the port to actually free, clear hypnotoad's own
+    # pidfile, then start clean.
+    my @steps;
 
-    my $port_ok = $self->_ok($s);
+    my $stop = $self->_step_ubic_stop($name);
+    push @steps, $stop;   # a failed stop usually just means "already down" — keep going
+
+    my $port = $svc->{port};
+    if ($port) {
+        my $freed = $self->_wait_port_free($port);
+        push @steps, {
+            step    => 'port_drain',
+            success => $freed ? \1 : \0,
+            output  => $freed ? "Port $port freed"
+                              : "Port $port still bound after stop — starting anyway",
+        };
+    }
+
+    $self->_clear_hypnotoad_pid($svc)
+        if ($svc->{runner} // 'hypnotoad') eq 'hypnotoad';
+
+    my $start = $self->_step_ubic_start($name);
+    push @steps, $start;
+    return $self->_deploy_result($name, 'error', 'Ubic start failed', \@steps)
+        unless $self->_ok($start);
+
+    $self->_sleep(2);
+    my $pc = $self->_step_port_check($svc);
+    push @steps, $pc;
+
+    my $port_ok = $self->_ok($pc);
     return $self->_deploy_result(
         $name,
         $port_ok ? 'success' : 'error',
@@ -250,6 +282,47 @@ sub restart ($self, $name) {
         \@steps,
     );
 }
+
+sub _step_ubic_stop ($self, $name) {
+    my $r = $self->_run_cmd("ubic stop $name");
+    return { step => 'ubic_stop', success => $r->{ok} ? \1 : \0, output => $r->{output} };
+}
+
+sub _step_ubic_start ($self, $name) {
+    my $r = $self->_run_cmd("ubic start $name");
+    return { step => 'ubic_start', success => $r->{ok} ? \1 : \0, output => $r->{output} };
+}
+
+# Poll until nothing answers on $port (the old workers have released it), or
+# until $timeout polls have elapsed. Returns 1 if freed, 0 if it gave up.
+sub _wait_port_free ($self, $port, $timeout = 15) {
+    return 1 unless $port;
+    my $slept = 0;
+    while (1) {
+        return 1 unless $self->_check_port($port);
+        last if $slept >= $timeout;
+        $self->_sleep(1);
+        $slept++;
+    }
+    return 0;
+}
+
+# Remove hypnotoad's own pidfile so the next `hypnotoad -f` can't mistake a
+# half-dead manager for a live one and degrade into a USR2 hot-deploy. The
+# pidfile lives next to the entry script (default) or at the repo root.
+sub _clear_hypnotoad_pid ($self, $svc) {
+    my $repo = $svc->{repo} or return;
+    my @rel = ('bin/hypnotoad.pid', 'hypnotoad.pid');
+    if (($svc->{bin} // '') =~ m{^(.+)/}) {
+        unshift @rel, "$1/hypnotoad.pid";
+    }
+    my %seen;
+    my @paths = grep { !$seen{$_}++ } map { "$repo/$_" } @rel;
+    $self->_run_cmd('rm -f ' . join(' ', @paths));
+}
+
+# Indirection so tests can run the restart sequence without real sleeps.
+sub _sleep ($self, $seconds) { sleep $seconds }
 
 sub migrate ($self, $name) {
     my $svc = $self->config->service($name);
