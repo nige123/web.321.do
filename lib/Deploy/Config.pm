@@ -86,12 +86,17 @@ sub _resolve ($self, $name, $manifest) {
     my $is_worker = exists $manifest->{_parent};
     my $runner = $is_worker ? 'script' : ($target->{runner} // $manifest->{runner} // 'hypnotoad');
 
+    # Mode is a property of the target, not the runner. Workers force runner
+    # to 'script' so the old runner-based heuristic baked MOJO_MODE=production
+    # into dev workers and they'd try to reach the live DB.
+    my $mode = ($target_name eq 'dev') ? 'development' : 'production';
+
     return {
         name         => $name,
         repo         => $manifest->{repo},
         branch       => $manifest->{branch} // 'master',
         bin          => $manifest->{entry},
-        mode         => $runner eq 'morbo' ? 'development' : 'production',
+        mode         => $mode,
         runner       => $runner,
         port         => $is_worker ? undef : $target->{port},
         host         => $target->{host} // 'localhost',
