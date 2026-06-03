@@ -127,16 +127,20 @@ sub deploy ($self, $name, %opts) {
         push @steps, { step => 'generate_ubic', success => \1, output => "Generated: $gen->{path}" };
     }
 
-    $s = $self->_step_ubic_restart($name);
-    push @steps, $s;
-    return $self->_deploy_result($name, 'error', 'Ubic restart failed', \@steps)
-        unless $self->_ok($s);
+    # Authoritative bounce (stop → drain → clear pidfile → start), not a bare
+    # `ubic restart` — same race fix as the restart command. See _bounce_steps.
+    my @bounce = $self->_bounce_steps($name, $svc);
+    push @steps, @bounce;
+    unless ($self->_ok($bounce[-1])) {
+        my $msg = $svc->{is_worker} ? 'Ubic restart failed' : 'Ubic start failed';
+        return $self->_deploy_result($name, 'error', $msg, \@steps);
+    }
 
-    # Workers have no port to probe — ubic_restart success is the deploy
+    # Workers have no port to probe — a successful bounce is the deploy
     # success criterion for them.
     my $final_ok = 1;
     unless ($svc->{is_worker}) {
-        sleep 2;
+        $self->_sleep(2);
         $s = $self->_step_port_check($svc);
         push @steps, $s;
         $final_ok = $self->_ok($s);
@@ -227,48 +231,16 @@ sub restart ($self, $name) {
     my $svc = $self->config->service($name);
     return { status => 'error', message => "Unknown service: $name" } unless $svc;
 
-    # Workers have no port and no hypnotoad pidfile — a plain `ubic restart`
-    # in place is safe and keeps the cascade fast.
+    my @steps = $self->_bounce_steps($name, $svc);
+    unless ($self->_ok($steps[-1])) {
+        my $msg = $svc->{is_worker} ? 'Ubic restart failed' : 'Ubic start failed';
+        return $self->_deploy_result($name, 'error', $msg, \@steps);
+    }
+
+    # Workers have no port — a clean bounce is the whole story.
     if ($svc->{is_worker}) {
-        my $s = $self->_step_ubic_restart($name);
-        return $self->_deploy_result(
-            $name,
-            $self->_ok($s) ? 'success' : 'error',
-            $self->_ok($s) ? "Restarted $name" : 'Ubic restart failed',
-            [$s],
-        );
+        return $self->_deploy_result($name, 'success', "Restarted $name", \@steps);
     }
-
-    # Authoritative restart, NOT a bare `ubic restart` (= stop+start with no
-    # coordination). A bare start races the still-draining old manager:
-    # `hypnotoad -f` finds the previous bin/hypnotoad.pid alive, sends it
-    # USR2 (hot deploy) and exits — so the PID never changes ("phantom
-    # restart"), or the port is still bound ("Address already in use").
-    # Stop, wait for the port to actually free, clear hypnotoad's own
-    # pidfile, then start clean.
-    my @steps;
-
-    my $stop = $self->_step_ubic_stop($name);
-    push @steps, $stop;   # a failed stop usually just means "already down" — keep going
-
-    my $port = $svc->{port};
-    if ($port) {
-        my $freed = $self->_wait_port_free($port);
-        push @steps, {
-            step    => 'port_drain',
-            success => $freed ? \1 : \0,
-            output  => $freed ? "Port $port freed"
-                              : "Port $port still bound after stop — starting anyway",
-        };
-    }
-
-    $self->_clear_hypnotoad_pid($svc)
-        if ($svc->{runner} // 'hypnotoad') eq 'hypnotoad';
-
-    my $start = $self->_step_ubic_start($name);
-    push @steps, $start;
-    return $self->_deploy_result($name, 'error', 'Ubic start failed', \@steps)
-        unless $self->_ok($start);
 
     $self->_sleep(2);
     my $pc = $self->_step_port_check($svc);
@@ -281,6 +253,36 @@ sub restart ($self, $name) {
         $port_ok ? "Restarted $name" : 'Port check failed after restart',
         \@steps,
     );
+}
+
+# Bounce a service so ubic stays its sole supervisor. A bare `ubic restart`
+# (stop+start, no coordination) races the still-draining old manager:
+# `hypnotoad -f` finds the previous bin/hypnotoad.pid alive, sends it USR2
+# (hot deploy) and exits — so the PID never changes ("phantom restart"), or
+# the port is still bound ("Address already in use"). Instead: stop, wait for
+# the port to actually free, clear hypnotoad's own pidfile, then start clean.
+# Returns the ordered step list; the caller reads $steps[-1] for success.
+# Workers (no port, no pidfile) get a plain in-place `ubic restart`.
+sub _bounce_steps ($self, $name, $svc) {
+    return ($self->_step_ubic_restart($name)) if $svc->{is_worker};
+
+    my @steps = $self->_step_ubic_stop($name);  # a failed stop usually just means "already down"
+
+    if (my $port = $svc->{port}) {
+        my $freed = $self->_wait_port_free($port);
+        push @steps, {
+            step    => 'port_drain',
+            success => $freed ? \1 : \0,
+            output  => $freed ? "Port $port freed"
+                              : "Port $port still bound after stop — starting anyway",
+        };
+    }
+
+    $self->_clear_hypnotoad_pid($svc)
+        if ($svc->{runner} // 'hypnotoad') eq 'hypnotoad';
+
+    push @steps, $self->_step_ubic_start($name);
+    return @steps;
 }
 
 sub _step_ubic_stop ($self, $name) {

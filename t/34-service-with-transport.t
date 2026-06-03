@@ -60,9 +60,14 @@ subtest 'Deploy uses transport - passes apt_deps step' => sub {
     # Subclass to stub out expensive steps after apt_deps
     package StubTransportService;
     use parent -norequire, 'Deploy::Service';
-    # Stub ubic restart via transport: override _step_ubic_restart
-    sub _step_ubic_restart { return { step => 'ubic_restart', success => \1, output => 'stubbed' } }
-    sub _check_port         { return 1 }
+    # Stub the ubic bounce so deploy never shells out to real ubic.
+    sub _step_ubic_restart   { return { step => 'ubic_restart', success => \1, output => 'stubbed' } }
+    sub _step_ubic_stop      { return { step => 'ubic_stop',    success => \1, output => 'stubbed' } }
+    sub _step_ubic_start     { return { step => 'ubic_start',   success => \1, output => 'stubbed' } }
+    sub _wait_port_free      { return 1 }
+    sub _clear_hypnotoad_pid { }
+    sub _sleep               { }
+    sub _check_port          { return 1 }
 
     package main;
 

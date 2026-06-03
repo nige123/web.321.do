@@ -66,7 +66,7 @@ subtest 'deploy returns the same step sequence as before the refactor' => sub {
     my $r = $svc_mgr->deploy('demo.web', skip_git => 1);
     my @steps = map { $_->{step} } @{ $r->{data}{steps} };
     is_deeply \@steps,
-        [qw(apt_deps cpanm generate_ubic ubic_restart port_check)],
+        [qw(apt_deps cpanm generate_ubic ubic_stop port_drain ubic_start port_check)],
         'full deploy emits the expected step list (skip_git)';
 };
 
@@ -121,8 +121,8 @@ subtest 'deploy runs bin/migrate when present' => sub {
     my $r = $svc_mgr->deploy('demo.web', skip_git => 1);
     my @steps = map { $_->{step} } @{ $r->{data}{steps} };
     is_deeply \@steps,
-        [qw(apt_deps cpanm migrate generate_ubic ubic_restart port_check)],
-        'migrate slotted between cpanm and ubic_restart';
+        [qw(apt_deps cpanm migrate generate_ubic ubic_stop port_drain ubic_start port_check)],
+        'migrate slotted between cpanm and the ubic bounce';
 };
 
 subtest 'deploy aborts before restart when migrate fails' => sub {
@@ -139,7 +139,7 @@ subtest 'deploy aborts before restart when migrate fails' => sub {
     is $r->{status}, 'error',                      'deploy reports error';
     like $r->{message}, qr/Migration failed/i,     'message names the failure';
     my @steps = map { $_->{step} } @{ $r->{data}{steps} };
-    ok !(grep { $_ eq 'ubic_restart' } @steps),    'no restart after failed migrate';
+    ok !(grep { /^ubic_(stop|start|restart)$/ } @steps), 'no ubic bounce after failed migrate';
 };
 
 subtest 'update: runs git_pull+cpanm+migrate, no restart' => sub {
