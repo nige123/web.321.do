@@ -133,6 +133,7 @@ Failed worker steps are reported but don't abort the cascade or the main step. A
 - **`Set MOJO_CONFIG at .../app.pl line N`** — your app's startup demands MOJO_CONFIG; declare it in the target's `env:` block in `321.yml` and run `321 restart` (the ubic file auto-regenerates because the manifest mtime is newer).
 - **Live ubic file is a stale symlink to `<repo>/ubic/...`** — old layout. `321 install` and `321 go` now `rm -f` the destination before uploading; just rerun.
 - **`321 install` says perlbrew or cpanm fails** — check the live target has `ssh:` populated; an empty `ssh:` resolves to `ubuntu@` with no host and SSH errors out cryptically.
+- **`Global symbol "%Config" requires explicit package name` from a subcommand (e.g. `321 do`)** — the app's `bin/*.pl` globs every subdir of `local/lib/perl5` onto `@INC` (`glob ".../local/lib/perl5/*"`), so a namespace dir like `HTTP/` shadows core `Config.pm`. The daemon dodges it (hypnotoad loads `Config` early); subcommands don't. Fix the app: drop the glob (PERL5LIB already pulls in the arch dir) or resolve only `$Config{archname}`. `321 doctor` flags this in every repo's `bin/*.pl`.
 - **Editing sibling repos** — when working in `web.321.do`, propose changes to other service repos as diffs; don't edit them directly unless the user explicitly asks.
 
 ## Operational rules

@@ -167,6 +167,41 @@ live:
 
 If a target's hypnotoad runner needs to listen on a specific port, the app's production config must set `hypnotoad => { listen => ['http://*:PORT'] }` to match the manifest port — 321 can't pass it on the command line. A mismatch shows up as a `port_check` failure with the actual bound port in the hint.
 
+### Entry script `@INC` — never glob the local-lib tree
+
+The entry script's `BEGIN` block should add its own `lib/` and the **base** of the bundled local-lib, and stop there:
+
+```perl
+use FindBin;
+BEGIN {
+    unshift @INC, "$FindBin::Bin/../lib";
+    unshift @INC, "$FindBin::Bin/lib";
+    unshift @INC, "$FindBin::Bin/../local/lib/perl5";
+}
+```
+
+That base is enough: 321 always exports `PERL5LIB=<repo>/local/lib/perl5`, and perl automatically appends the architecture subdir (`…/local/lib/perl5/x86_64-linux`) of every `PERL5LIB` entry, so compiled (XS) modules load with no extra work.
+
+**Do not** glob every subdirectory of the local-lib onto `@INC`:
+
+```perl
+# WRONG — puts namespace dirs like HTTP/ on @INC, where HTTP/Config.pm
+# shadows core Config and breaks `use Config` in File::Copy / Mojo::File
+# with: Global symbol "%Config" requires explicit package name
+for my $arch (glob "$FindBin::Bin/../local/lib/perl5/*") {
+    unshift @INC, $arch if -d $arch;
+}
+```
+
+The supervised daemon hides this bug (hypnotoad loads `Config` early), but a bare `perl bin/app.pl <subcommand>` — e.g. via `321 do` — trips it. If you genuinely need the arch dir on `@INC` for a standalone run, resolve **only** that dir, never the whole tree:
+
+```perl
+require Config;
+unshift @INC, "$FindBin::Bin/../local/lib/perl5/$Config::Config{archname}";
+```
+
+`321 doctor` audits every repo's `bin/*.pl` for the bare-glob form and fails if it finds one. `321 do` also preloads core `Config` (`perl -MConfig …`) as a belt-and-suspenders so subcommands survive a not-yet-fixed app.
+
 ## Development
 
 ```bash
