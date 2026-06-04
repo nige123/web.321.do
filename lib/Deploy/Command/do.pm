@@ -83,7 +83,13 @@ sub build_command ($self, $svc, $subcmd, $args) {
 
     my $env_str = join ' ', map { "$_=" . _shq($env{$_}) } sort keys %env;
 
-    my $invoke = join ' ', 'perl', $svc->{bin}, $subcmd, map { _shq($_) } @$args;
+    # -MConfig preloads core Config before the app's own startup. Apps commonly
+    # unshift every subdir of their bundled local/lib/perl5 onto @INC in a BEGIN
+    # block; that can shadow core Config.pm (e.g. via HTTP/Config.pm) so a later
+    # `use Config` in File::Copy/Mojo::File fails with "%Config requires explicit
+    # package name". The supervised daemon dodges this only because hypnotoad
+    # loads Config early — preloading it here reproduces that same load order.
+    my $invoke = join ' ', 'perl', '-MConfig', $svc->{bin}, $subcmd, map { _shq($_) } @$args;
 
     return "perlbrew exec --with $perl env $env_str $invoke";
 }

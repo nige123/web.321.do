@@ -105,10 +105,16 @@ subtest 'build_command reproduces the runtime env and invokes the subcommand' =>
     like $c, qr{MOJO_CONFIG='/home/ubuntu/app\.petals/conf/production\.conf'},
         'passes the live MOJO_CONFIG';
     like $c, qr{PERL5LIB='[^']*/app\.petals/local/lib/perl5'}, 'sets repo-local PERL5LIB';
-    like $c, qr/perl bin\/app\.pl create_admin 'nige\@123\.do'/,
+    like $c, qr/perl -MConfig bin\/app\.pl create_admin 'nige\@123\.do'/,
         'runs the entry with the subcommand and quoted args';
+    # Core Config is preloaded before the app script. Apps that unshift their
+    # bundled local-lib subdirs onto @INC (a common app.pl pattern) can shadow
+    # core Config.pm; the supervised daemon only dodges this because hypnotoad
+    # loads Config early. Mirror that load order so subcommands resolve the same
+    # modules the daemon does.
+    like $c, qr/perl -MConfig /, 'preloads core Config ahead of the app';
     # env must come before the perl invocation
-    ok index($c, 'MOJO_MODE') < index($c, 'perl bin/app.pl'),
+    ok index($c, 'MOJO_MODE') < index($c, 'perl -MConfig bin/app.pl'),
         'env precedes the perl invocation';
 };
 
