@@ -96,6 +96,19 @@ sub stream ($self, $cmd, %opts) {
     return { ok => ($? == 0 ? 1 : 0) };
 }
 
+# exec_in_dir($dir, $cmd) — run an interactive command locally, inheriting the
+# caller's STDIN/STDOUT/STDERR (no capture) so prompts work and output streams
+# live. Runs under a login shell so perlbrew is sourced and `perlbrew exec
+# --with …` inside $cmd resolves. Returns {ok, exit_code}.
+sub exec_in_dir ($self, $dir, $cmd) {
+    my $script = "source ~/perl5/perlbrew/etc/bashrc 2>/dev/null; cd \Q$dir\E && $cmd";
+    warn "  [local exec] $cmd\n" if $ENV{VERBOSE};
+    $self->log->info("Local exec: $script") if $self->log;
+    my $rc = system('bash', '-lc', $script);
+    my $exit_code = $rc == -1 ? -1 : $rc >> 8;
+    return { ok => ($exit_code == 0 ? 1 : 0), exit_code => $exit_code };
+}
+
 # upload($local, $remote) — local file copy. Return {ok, output}.
 sub upload ($self, $local, $remote) {
     my $ok = copy($local, $remote);

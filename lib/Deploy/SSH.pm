@@ -44,6 +44,31 @@ sub _ssh_cmd_in_dir ($self, $dir, $cmd) {
     return $self->_ssh_cmd("cd $dir && $cmd");
 }
 
+# _ssh_exec_cmd($dir, $cmd) — like _ssh_cmd but for INTERACTIVE one-shot
+# commands: allocate a remote TTY (-t) so prompts (e.g. a password) work and
+# output streams straight to the user's terminal. Sources perlbrew's bashrc so
+# `perlbrew exec --with …` inside $cmd resolves, then cds into $dir.
+sub _ssh_exec_cmd ($self, $dir, $cmd) {
+    my $remote  = "test -f ~/perl5/perlbrew/etc/bashrc && source ~/perl5/perlbrew/etc/bashrc; "
+                . "cd $dir && $cmd";
+    my $escaped = $self->_shell_escape($remote);
+    return sprintf(
+        "ssh -t -i %s -o StrictHostKeyChecking=accept-new %s\@%s '%s'",
+        $self->key, $self->user, $self->host, $escaped,
+    );
+}
+
+# exec_in_dir($dir, $cmd) — run an interactive command over SSH, inheriting the
+# caller's STDIN/STDOUT/STDERR (no capture). Returns {ok, exit_code}.
+sub exec_in_dir ($self, $dir, $cmd) {
+    my $full = $self->_ssh_exec_cmd($dir, $cmd);
+    warn "  [ssh -t] cd $dir && $cmd\n" if $ENV{VERBOSE};
+    $self->log->info("SSH exec: $full") if $self->log;
+    my $rc = system($full);
+    my $exit_code = $rc == -1 ? -1 : $rc >> 8;
+    return { ok => ($exit_code == 0 ? 1 : 0), exit_code => $exit_code };
+}
+
 # _scp_cmd($local, $remote) — build scp command string.
 sub _scp_cmd ($self, $local, $remote) {
     return sprintf(

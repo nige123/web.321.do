@@ -96,9 +96,22 @@ All JSON responses follow `{ status, message, data }`.
 321 go <service>           # deploy: git pull + cpanm + ubic restart (dev mode: ubic restart only)
 321 install <service>      # first-time: clone + cpanm + ubic + nginx + certbot
 321 generate               # regenerate all ubic service files + symlinks
+321 do [service] <target> <subcommand> [args]   # run an app's own Mojo subcommand at a target
 ```
 
 Service-name arguments accept prefix/substring matches (see `Deploy::Command::resolve_service`).
+
+### Running a service's own subcommands (`321 do`)
+
+`321 do` runs one of a service app's **own** Mojolicious subcommands (e.g. a `create_admin` command the app registers) in that service's real runtime — the right perlbrew perl, the target's `env:` (`MOJO_MODE`, `MOJO_CONFIG`, …), and repo-local `PERL5LIB` — from inside the repo, locally on dev or over SSH on live.
+
+```
+321 do live create_admin nige@123.do    # cwd repo's service, on live
+321 do petals.web live create_admin x   # explicit service
+321 do routes                            # cwd repo, dev (default target)
+```
+
+The target is whichever argument names a known target (`dev`/`live`); tokens before it are the optional service (else inferred from the cwd `321.yml`); tokens after it are the subcommand and its args. It's **interactive** — a TTY is allocated (`ssh -t` on live, `bash -lc` locally), so prompts work and output streams live, and `321 do` exits with the subcommand's own exit code. Implemented in `Deploy::Command::do`; execution goes through `Deploy::{Local,SSH}::exec_in_dir`.
 
 ### Auth
 
