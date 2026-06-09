@@ -34,6 +34,20 @@ sub run ($self, @args) {
 
     my $transport = $self->transport_for($name, $target);
 
+    # Verify we can actually reach the target before deciding install vs
+    # deploy. A timed-out / refused SSH returns no output, and the install
+    # check below would read that empty result as "repo absent" and clone
+    # over a live install. Bail with a clear message instead.
+    unless ($self->_reachable($transport)) {
+        my $where = $svc->{ssh} // $target;
+        say "";
+        say "  \e[31m[FAIL] Can't reach $target over SSH\e[0m";
+        say "  $where is not responding — host down, or SSH (port 22) blocked.";
+        say "  Running services are unaffected; this only blocks deploys.";
+        say "  Check:  ssh $where";
+        return;
+    }
+
     # First-time bring-up vs hot-restart: install if the repo OR the ubic
     # service file is missing. A partial install (repo cloned but ubic file
     # gone) re-triggers install rather than failing in deploy.
@@ -72,6 +86,14 @@ sub run ($self, @args) {
             $self->print_worker_step('restart', $row);
         }
     }
+}
+
+# _reachable($transport) — true if the target answers a trivial probe. A
+# timed-out / refused SSH returns empty or "Error: …" output instead of the
+# token, so a transport failure is never mistaken for "repo absent".
+sub _reachable ($self, $transport) {
+    my $r = $transport->run('echo 321-reachable');
+    return (($r->{output} // '') =~ /321-reachable/) ? 1 : 0;
 }
 
 # A plain `321 go` should leave the service actually reachable — not just the

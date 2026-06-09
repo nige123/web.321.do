@@ -367,6 +367,7 @@ package TestGoTransport {
     }
     sub run {
         my ($self, $cmd, %opts) = @_;
+        return { ok => 1, output => "321-reachable\n" } if $cmd =~ /321-reachable/;
         if ($self->{first}) {
             $self->{first} = 0;
             return { ok => 1, output => "OK\n" };   # install probe passes
