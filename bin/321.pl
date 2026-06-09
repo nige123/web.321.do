@@ -7,6 +7,14 @@ use Mojolicious::Lite -signatures;
 use Mojo::File qw(curfile);
 use Mojo::Util qw(decode);
 
+# Command modules use Mojo::Base, which turns on `use utf8` — so the em-dashes
+# and other non-ASCII in their `say`/`print` strings are decoded wide chars.
+# Give the CLI's output handles a UTF-8 layer so they encode cleanly instead of
+# warning "Wide character in say". Harmless for the daemon: HTTP responses go
+# out the socket, not STDOUT, and these only affect terminal/log output.
+binmode STDOUT, ':encoding(UTF-8)';
+binmode STDERR, ':encoding(UTF-8)';
+
 app->config(hypnotoad => {listen => ['http://127.0.0.1:9321']});
 unshift @{app->commands->namespaces}, 'Deploy::Command';
 
