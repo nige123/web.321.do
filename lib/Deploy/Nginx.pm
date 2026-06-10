@@ -64,7 +64,7 @@ sub generate ($self, $name) {
         $self->transport->upload($tmp->filename, "/tmp/$host.conf");
         $self->transport->run("sudo mv /tmp/$host.conf $dest");
     } elsif ($dest =~ m{^/etc/}) {
-        # System path — needs sudo
+        # System path - needs sudo
         require File::Temp;
         my $tmp = File::Temp->new(SUFFIX => '.conf');
         print $tmp $conf;
@@ -72,7 +72,7 @@ sub generate ($self, $name) {
         system("sudo mv ${\$tmp->filename} $dest") == 0
             or return { status => 'error', message => "Failed to write nginx config (sudo needed)" };
     } else {
-        # Non-system path (tests) — write directly
+        # Non-system path (tests) - write directly
         path($dest)->spew_utf8($conf);
     }
 
@@ -187,7 +187,7 @@ sub status ($self, $name) {
 
     my ($config_exists, $enabled, $ssl);
     if ($self->transport) {
-        # One round trip — letsencrypt path needs sudo; the others don't.
+        # One round trip - letsencrypt path needs sudo; the others don't.
         my $out = $self->transport->run(
             "test -f $avail && echo A; "
           . "test -L $link  && echo B; "
@@ -281,13 +281,13 @@ NGINX
     if ($has_ssl && $force_https) {
         $conf .= "    location / { return 301 https://\$host\$request_uri; }\n}\n\n";
     } else {
-        # Either no cert, or force_https is off — proxy_pass through HTTP.
+        # Either no cert, or force_https is off - proxy_pass through HTTP.
         $conf .= $proxy_block;
         $conf .= "\n" if $has_ssl;
     }
 
     if ($has_ssl) {
-        # HSTS only when we're forcing HTTPS — a force_https=false service
+        # HSTS only when we're forcing HTTPS - a force_https=false service
         # legitimately answers on HTTP, so don't lock browsers out.
         my $hsts = $force_https
             ? "    add_header Strict-Transport-Security \"max-age=31536000\" always;\n"

@@ -5,7 +5,7 @@ use Test::Mojo;
 
 my $t = Test::Mojo->new(Mojo::File->new('bin/321.pl'));
 
-# Deploy unknown service — no auth needed, returns error payload
+# Deploy unknown service - no auth needed, returns error payload
 $t->post_ok('/service/nonexistent/deploy')
   ->status_is(200)
   ->json_is('/status' => 'error')

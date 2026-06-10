@@ -25,7 +25,7 @@ sub run ($self, @argv) {
     # Make sure the repo is actually there before we try to run in it.
     my $check = $transport->run("test -d $svc->{repo}/.git && echo OK");
     unless (($check->{output} // '') =~ /OK/) {
-        die "Repo not found at $svc->{repo} on $p->{target} — run '321 install $name "
+        die "Repo not found at $svc->{repo} on $p->{target} - run '321 install $name "
           . "$p->{target}' first\n";
     }
 
@@ -40,7 +40,7 @@ sub run ($self, @argv) {
     exit($r->{exit_code} // 0);
 }
 
-# parse_args(@argv) — split into { service, target, subcmd, args }.
+# parse_args(@argv) - split into { service, target, subcmd, args }.
 #
 # The target is the first argument that names a known target (dev/live/…).
 # Tokens before it are the (optional, at most one) service; tokens after it are
@@ -70,7 +70,7 @@ sub parse_args ($self, @argv) {
     return { service => $service, target => $target, subcmd => $subcmd, args => [@rest] };
 }
 
-# build_command($svc, $subcmd, \@args) — the shell command that reproduces the
+# build_command($svc, $subcmd, \@args) - the shell command that reproduces the
 # service's runtime (perl version + env + repo-local libs) and invokes the
 # Mojolicious subcommand. Run from inside the repo by the transport.
 sub build_command ($self, $svc, $subcmd, $args) {
@@ -88,7 +88,7 @@ sub build_command ($self, $svc, $subcmd, $args) {
     # block; that can shadow core Config.pm (e.g. via HTTP/Config.pm) so a later
     # `use Config` in File::Copy/Mojo::File fails with "%Config requires explicit
     # package name". The supervised daemon dodges this only because hypnotoad
-    # loads Config early — preloading it here reproduces that same load order.
+    # loads Config early - preloading it here reproduces that same load order.
     my $invoke = join ' ', 'perl', '-MConfig', $svc->{bin}, $subcmd, map { _shq($_) } @$args;
 
     return "perlbrew exec --with $perl env $env_str $invoke";
@@ -109,7 +109,7 @@ sub _shq ($val) {
 
   Run one of a service app's own Mojolicious subcommands in that service's
   real runtime environment (right perl, MOJO_MODE/MOJO_CONFIG, repo-local
-  libs), locally on dev or over SSH on live. Interactive — prompts work and
+  libs), locally on dev or over SSH on live. Interactive - prompts work and
   output streams live; exits with the subcommand's exit code.
 
   321 do live create_admin nige@123.do   # cwd repo, on live

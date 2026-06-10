@@ -8,7 +8,7 @@ $ENV{DEPLOY_TOKEN} = 'test-token-123';
 
 my $t = Test::Mojo->new(Mojo::File->new('bin/321.pl'));
 
-# Health endpoint is public — no auth needed
+# Health endpoint is public - no auth needed
 $t->get_ok('/health')
   ->status_is(200)
   ->json_is('/status' => 'success')

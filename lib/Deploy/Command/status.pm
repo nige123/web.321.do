@@ -27,7 +27,7 @@ sub _show_status ($self, $svc_input, $target) {
         ? ($self->resolve_service($svc_input))
         : @{ $self->config->service_names };
 
-    # Batch `ubic status` per transport endpoint — one fork covers all services
+    # Batch `ubic status` per transport endpoint - one fork covers all services
     # on the same host, then we look up each by name.
     my %status_cache;
     for my $name (@names) {

@@ -1,6 +1,6 @@
 package Deploy::CertProvider;
 
-# Caller must validate $host — this module performs no shell escaping.
+# Caller must validate $host - this module performs no shell escaping.
 # Hostnames reaching acquire_cmd should already be through Deploy::Nginx::_valid_host.
 
 use Mojo::Base -base, -signatures;
@@ -8,7 +8,7 @@ use Mojo::Base -base, -signatures;
 # Where nginx-readable certs land (dev via mkcert). Live uses /etc/letsencrypt.
 has 'ssl_dir' => '/etc/ssl/321';
 
-# mkcert CAROOT — where mkcert stores its local CA. Preserved across `sudo`.
+# mkcert CAROOT - where mkcert stores its local CA. Preserved across `sudo`.
 has 'mkcert_dir' => sub { "$ENV{HOME}/.local/share/mkcert" };
 
 sub pick ($self, $target) {

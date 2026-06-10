@@ -26,7 +26,7 @@ sub resolve_service ($self, $input) {
         die "Ambiguous: '$input' matches: " . join(', ', @m) . "\n";
     }
 
-    # Not found — scaffold 321.yml if we're in a repo dir without one
+    # Not found - scaffold 321.yml if we're in a repo dir without one
     if (-d '.git' && ! -f '321.yml') {
         require Cwd;
         my $cwd = Cwd::getcwd();
@@ -58,7 +58,7 @@ sub resolve_service ($self, $input) {
 
 sub parse_target ($self, @args) {
     if (!@args) {
-        # No args — try to infer service from cwd
+        # No args - try to infer service from cwd
         my $svc = $self->_infer_service;
         return ($svc, 'dev') if $svc;
         return (undef, 'dev');
@@ -210,7 +210,7 @@ sub print_steps ($self, $r) {
         my $ok = $self->step_ok($step);
         printf "  [%s] %s\n", ($ok ? 'OK' : 'FAIL'), $step->{step};
         next if $ok;
-        # Show why a step failed — the error from cpanm, nginx -t, the port
+        # Show why a step failed - the error from cpanm, nginx -t, the port
         # check hint, etc. Successful steps stay quiet.
         say "      $_" for grep { length } split /\n/, ($step->{output} // '');
     }
@@ -240,7 +240,7 @@ sub print_failure ($self, $transport, $name, $target, $message = undef) {
 # Run "ubic <action> <worker>" on the given transport for every worker
 # belonging to the main service $name. For 'stop', the worker list is
 # reversed so workers settle before the main. Returns an arrayref of
-# { name, ok, output } rows — one per worker step. A per-worker failure
+# { name, ok, output } rows - one per worker step. A per-worker failure
 # is recorded; the loop keeps going.
 sub cascade_workers ($self, $name, $action, $transport) {
     my $workers = $self->config->workers_of($name);
@@ -263,7 +263,7 @@ sub print_worker_step ($self, $action, $row) {
     if ($row->{ok}) {
         printf "  [OK] worker %s %sed\n", $row->{name}, $action;
     } else {
-        printf "  [FAIL] worker %s %s — %s\n", $row->{name}, $action, $row->{output};
+        printf "  [FAIL] worker %s %s - %s\n", $row->{name}, $action, $row->{output};
     }
 }
 

@@ -49,7 +49,7 @@ sub write ($self, $hosts) {
         $file->spew_utf8($content);
     }
     else {
-        # /etc/hosts is root-owned — stage the new file and sudo it into place.
+        # /etc/hosts is root-owned - stage the new file and sudo it into place.
         require File::Temp;
         my $tmp = File::Temp->new;
         binmode $tmp, ':encoding(UTF-8)';

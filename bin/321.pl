@@ -1,13 +1,13 @@
 #!/usr/bin/env perl
 
-# 321.do — standalone deploy and log analysis service
+# 321.do - standalone deploy and log analysis service
 # See CLAUDE.md for full specification
 
 use Mojolicious::Lite -signatures;
 use Mojo::File qw(curfile);
 use Mojo::Util qw(decode);
 
-# Command modules use Mojo::Base, which turns on `use utf8` — so the em-dashes
+# Command modules use Mojo::Base, which turns on `use utf8` - so the em-dashes
 # and other non-ASCII in their `say`/`print` strings are decoded wide chars.
 # Give the CLI's output handles a UTF-8 layer so they encode cleanly instead of
 # warning "Wide character in say". Harmless for the daemon: HTTP responses go
@@ -341,7 +341,7 @@ __DATA__
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title><%= title %> — 321.do</title>
+<title><%= title %> - 321.do</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23010a01'/%3E%3Cpolygon points='12,8 12,24 26,16' fill='%2300ff41'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600;700&family=Orbitron:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">

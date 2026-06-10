@@ -19,7 +19,7 @@ sub status ($self, $name) {
 
     my $pid = $self->_get_pid($name, $svc);
     my $git_sha = $self->_git_sha($svc->{repo}, $svc->{branch});
-    # skip port check for stopped services — avoids 2s curl timeout each
+    # skip port check for stopped services - avoids 2s curl timeout each
     my $port_ok = $pid ? $self->_check_port($svc->{port}) : 0;
 
     return $self->_status_hash($name, $svc, $pid, $git_sha, $port_ok);
@@ -38,14 +38,14 @@ sub all_status ($self) {
         next unless $svc;
 
         # On the live deployment of 321.do, hide services not actually
-        # installed on this box — dev-only services would just be noise.
+        # installed on this box - dev-only services would just be noise.
         # On dev we keep them all so the local dashboard can survey both
         # targets via the target switcher.
         next if $self->filter_to_local && !exists $statuses->{$name};
 
         my $pid = $statuses->{$name}{pid};
         my $git_sha = $self->_git_sha($svc->{repo}, $svc->{branch});
-        # port check skipped here — too slow for dashboard hot path
+        # port check skipped here - too slow for dashboard hot path
         my $running = $pid ? 1 : 0;
 
         push @results, $self->_status_hash($name, $svc, $pid, $git_sha, $running);
@@ -128,7 +128,7 @@ sub deploy ($self, $name, %opts) {
     }
 
     # Authoritative bounce (stop → drain → clear pidfile → start), not a bare
-    # `ubic restart` — same race fix as the restart command. See _bounce_steps.
+    # `ubic restart` - same race fix as the restart command. See _bounce_steps.
     my @bounce = $self->_bounce_steps($name, $svc);
     push @steps, @bounce;
     unless ($self->_ok($bounce[-1])) {
@@ -136,7 +136,7 @@ sub deploy ($self, $name, %opts) {
         return $self->_deploy_result($name, 'error', $msg, \@steps);
     }
 
-    # Workers have no port to probe — a successful bounce is the deploy
+    # Workers have no port to probe - a successful bounce is the deploy
     # success criterion for them.
     my $final_ok = 1;
     unless ($svc->{is_worker}) {
@@ -199,11 +199,11 @@ sub _step_port_check ($self, $svc) {
     # Common cause for hypnotoad services: the app's own config binds a
     # different port than the 321 manifest declares. hypnotoad takes its
     # listen port from app->config->{hypnotoad}{listen}, which 321 can't pass
-    # on the command line — so if the app is up on some other port, say so.
+    # on the command line - so if the app is up on some other port, say so.
     if (($svc->{runner} // 'hypnotoad') eq 'hypnotoad') {
         my $bound = $self->_logged_listen_port($svc);
         if ($bound && $bound != $port && $self->_check_port($bound)) {
-            $output .= " — the app is actually serving on $bound."
+            $output .= " - the app is actually serving on $bound."
                      . "  Add  'hypnotoad' => { listen => ['http://*:$port'] }  to the"
                      . " app's production config so it matches the 321 manifest.";
         }
@@ -237,7 +237,7 @@ sub restart ($self, $name) {
         return $self->_deploy_result($name, 'error', $msg, \@steps);
     }
 
-    # Workers have no port — a clean bounce is the whole story.
+    # Workers have no port - a clean bounce is the whole story.
     if ($svc->{is_worker}) {
         return $self->_deploy_result($name, 'success', "Restarted $name", \@steps);
     }
@@ -258,7 +258,7 @@ sub restart ($self, $name) {
 # Bounce a service so ubic stays its sole supervisor. A bare `ubic restart`
 # (stop+start, no coordination) races the still-draining old manager:
 # `hypnotoad -f` finds the previous bin/hypnotoad.pid alive, sends it USR2
-# (hot deploy) and exits — so the PID never changes ("phantom restart"), or
+# (hot deploy) and exits - so the PID never changes ("phantom restart"), or
 # the port is still bound ("Address already in use"). Instead: stop, wait for
 # the port to actually free, clear hypnotoad's own pidfile, then start clean.
 # Returns the ordered step list; the caller reads $steps[-1] for success.
@@ -274,7 +274,7 @@ sub _bounce_steps ($self, $name, $svc) {
             step    => 'port_drain',
             success => $freed ? \1 : \0,
             output  => $freed ? "Port $port freed"
-                              : "Port $port still bound after stop — starting anyway",
+                              : "Port $port still bound after stop - starting anyway",
         };
     }
 

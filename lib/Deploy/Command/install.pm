@@ -229,7 +229,7 @@ sub run ($self, @args) {
     if ($host ne 'localhost' && $port) {
         $self->nginx->transport($transport);
 
-        # Skip the regen if a working site already exists — a hand-edited
+        # Skip the regen if a working site already exists - a hand-edited
         # SSL config on live should not be silently clobbered by re-installs.
         my $enabled_check = $transport->run("test -L /etc/nginx/sites-enabled/$host && echo OK");
         my $already_enabled = ($enabled_check->{output} // '') =~ /OK/;

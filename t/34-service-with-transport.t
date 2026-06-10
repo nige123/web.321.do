@@ -53,7 +53,7 @@ subtest 'Default transport is Deploy::Local' => sub {
     isa_ok $svc_mgr->transport, 'Deploy::Local', 'default transport is Deploy::Local';
 };
 
-# 3. Deploy uses transport — gets through apt_deps step at minimum
+# 3. Deploy uses transport - gets through apt_deps step at minimum
 subtest 'Deploy uses transport - passes apt_deps step' => sub {
     my ($home, $repo, $scan, $scan_obj, $home_obj) = make_fixture();
 
@@ -88,7 +88,7 @@ subtest 'Deploy uses transport - passes apt_deps step' => sub {
     ok ${ $apt_step->{success} }, 'apt_deps step succeeded (no apt_deps declared)';
 };
 
-# 4. Status uses transport for git sha — returns valid hex sha
+# 4. Status uses transport for git sha - returns valid hex sha
 subtest 'Status uses transport for git sha' => sub {
     my ($home, $repo, $scan, $scan_obj, $home_obj) = make_fixture();
     my $svc_mgr = Deploy::Service->new(

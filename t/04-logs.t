@@ -6,7 +6,7 @@ use Path::Tiny qw(path);
 
 my $t = Test::Mojo->new(Mojo::File->new('bin/321.pl'));
 
-# Logs for unknown service — no auth needed
+# Logs for unknown service - no auth needed
 $t->get_ok('/service/nonexistent/logs')
   ->status_is(200)
   ->json_is('/status' => 'error');
@@ -21,7 +21,7 @@ $test_log->spew_utf8(join("\n",
     '2026-04-03T07:04:00 [error] Connection timeout',
 ) . "\n");
 
-# Search logs — missing query
+# Search logs - missing query
 $t->get_ok('/service/123.api/logs/search')
   ->status_is(200)
   ->json_is('/status' => 'error')

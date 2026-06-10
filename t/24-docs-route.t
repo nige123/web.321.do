@@ -5,7 +5,7 @@ use Test::Mojo;
 
 my $t = Test::Mojo->new(Mojo::File->new('bin/321.pl'));
 
-# No auth needed — 200, rendered markdown
+# No auth needed - 200, rendered markdown
 $t->get_ok('/docs')
   ->status_is(200)
   ->content_type_like(qr{text/html})

@@ -5,7 +5,7 @@ use Deploy::Command::go;
 
 # `321 go` must verify the target is reachable BEFORE deciding install vs
 # deploy. A timed-out / refused SSH returns no usable output, which must not
-# be mistaken for "repo absent" — that would wrongly clone over a live
+# be mistaken for "repo absent" - that would wrongly clone over a live
 # install. _reachable($transport) probes with an echo token.
 
 # Minimal fake transport: returns whatever ->run was told to.

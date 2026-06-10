@@ -285,7 +285,7 @@ package TestStart {
 
 # Helper: a recording transport whose ubic status replies say "running",
 # so _start_one's "already running" branch fires for the main and workers
-# — which still records a 'ubic status' call we can assert on.
+# - which still records a 'ubic status' call we can assert on.
 sub start_transport_for_already_running {
     return RecordingTransport->new(replies => {
         'ubic status demo.web 2>&1'     => { ok => 1, output => "demo.web\trunning (pid 1234)\n" },
@@ -311,7 +311,7 @@ subtest 'start demo.web cascades to workers in sorted order' => sub {
             'ubic status demo.mailer 2>&1',
             'ubic status demo.printer 2>&1',
         ],
-        'main then each worker — sorted';
+        'main then each worker - sorted';
 };
 
 subtest 'start demo.printer (worker target) does not cascade' => sub {

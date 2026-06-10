@@ -59,7 +59,7 @@ sub run ($self, @args) {
         $log_mgr->stream($name, type => $opts{type} // 'stdout');
     } else {
         # Default: one-shot snapshot of the last N lines and exit.
-        # Agent-friendly — no Ctrl-C needed.
+        # Agent-friendly - no Ctrl-C needed.
         my $type = $opts{type} // 'stdout';
         my $n    = $opts{n}    // 100;
         $n = 1000 if $n > 1000;

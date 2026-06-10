@@ -59,7 +59,7 @@ sub _start_one ($self, $name, $target, $transport) {
     my $r = $transport->run("ubic start $name");
 
     if ($r->{output} && $r->{output} =~ /not found|unknown service/i) {
-        say "  \e[31m$name is not installed\e[0m — run: 321 install $name" . $self->target_flag($target);
+        say "  \e[31m$name is not installed\e[0m - run: 321 install $name" . $self->target_flag($target);
         return 0;
     }
 

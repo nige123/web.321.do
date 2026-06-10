@@ -42,7 +42,7 @@ sub run ($self, @args) {
         my $where = $svc->{ssh} // $target;
         say "";
         say "  \e[31m[FAIL] Can't reach $target over SSH\e[0m";
-        say "  $where is not responding — host down, or SSH (port 22) blocked.";
+        say "  $where is not responding - host down, or SSH (port 22) blocked.";
         say "  Running services are unaffected; this only blocks deploys.";
         say "  Check:  ssh $where";
         return;
@@ -60,7 +60,7 @@ sub run ($self, @args) {
     if ($needs_install) {
         my $install = Deploy::Command::install->new(app => $self->app);
         $install->run($name, $target);
-        # install handles nginx + SSL itself, but not /etc/hosts on dev —
+        # install handles nginx + SSL itself, but not /etc/hosts on dev -
         # _ensure_serving picks up that gap (and no-ops on the bits install
         # already did).
         $self->_ensure_serving($name, $target, $transport);
@@ -79,7 +79,7 @@ sub run ($self, @args) {
     $self->_ensure_serving($name, $target, $transport);
 
     # Workers share the repo we just deployed; just bounce them so they
-    # pick up new code. Gate on main deploy success — no point bouncing
+    # pick up new code. Gate on main deploy success - no point bouncing
     # workers if the main step bailed.
     if (($r->{status} // '') ne 'error') {
         for my $row (@{ $self->cascade_workers($name, 'restart', $transport) }) {
@@ -88,7 +88,7 @@ sub run ($self, @args) {
     }
 }
 
-# _reachable($transport) — true if the target answers a trivial probe. A
+# _reachable($transport) - true if the target answers a trivial probe. A
 # timed-out / refused SSH returns empty or "Error: …" output instead of the
 # token, so a transport failure is never mistaken for "repo absent".
 sub _reachable ($self, $transport) {
@@ -96,7 +96,7 @@ sub _reachable ($self, $transport) {
     return (($r->{output} // '') =~ /321-reachable/) ? 1 : 0;
 }
 
-# A plain `321 go` should leave the service actually reachable — not just the
+# A plain `321 go` should leave the service actually reachable - not just the
 # ubic process running. So after the deploy: on dev make sure the hostname
 # resolves; everywhere make sure the nginx vhost exists, is enabled, and has a
 # cert; on live make sure that cert actually matches the host. Whatever's
@@ -129,7 +129,7 @@ sub _ensure_serving ($self, $name, $target, $transport) {
         push @missing, 'enabled' unless $st->{enabled};
         push @missing, 'SSL'     unless $st->{ssl};
         say "";
-        say "  Nginx not fully configured for $host (missing: @{[join ', ', @missing]}) — setting up...";
+        say "  Nginx not fully configured for $host (missing: @{[join ', ', @missing]}) - setting up...";
     }
 
     my $setup = $self->nginx->setup($name);
@@ -153,12 +153,12 @@ sub _ensure_serving ($self, $name, $target, $transport) {
             say "  [OK] nginx reloaded with SSL";
         }
         elsif ($provider eq 'mkcert') {
-            say "  [SKIP] mkcert failed — install it, then re-run 321 go $name:";
+            say "  [SKIP] mkcert failed - install it, then re-run 321 go $name:";
             say "    sudo apt install -y libnss3-tools mkcert && mkcert -install";
             return;
         }
         else {
-            say "  [SKIP] certbot failed — point DNS for $host at the server, then:";
+            say "  [SKIP] certbot failed - point DNS for $host at the server, then:";
             say "    321 nginx $name $target";
             return;
         }
@@ -172,7 +172,7 @@ sub _ensure_serving ($self, $name, $target, $transport) {
 }
 
 # Make sure $host is in the /etc/hosts managed block. Rewrites the whole block
-# from every dev manifest (self-healing) — needs sudo, so only does the write
+# from every dev manifest (self-healing) - needs sudo, so only does the write
 # when something's actually missing.
 sub _ensure_dev_host ($self, $host) {
     my $hosts = Deploy::Hosts->new;

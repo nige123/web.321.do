@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 
-# 321 — CLI for managing services
+# 321 - CLI for managing services
 # Delegates to Mojolicious commands in bin/321.pl
 #
 # Usage: 321 install zorda.web   (first-time setup)

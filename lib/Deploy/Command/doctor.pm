@@ -45,7 +45,7 @@ sub run ($self, @args) {
 }
 
 # Audit every service repo's bin/*.pl for the fragile @INC glob (see
-# scan_inc). Source-only — target-independent — so it works on dev too.
+# scan_inc). Source-only - target-independent - so it works on dev too.
 # Returns the number of offending files found.
 sub _audit_inc ($self) {
     my @hits;
@@ -78,12 +78,12 @@ sub _audit_inc ($self) {
     say "  This globs every subdir of local/lib/perl5 onto \@INC, where a";
     say "  namespace dir (e.g. HTTP/) shadows core Config.pm and breaks";
     say "  `use Config` in File::Copy/Mojo::File. 321 already sets PERL5LIB,";
-    say "  so the arch dir loads automatically — drop the glob, or resolve";
+    say "  so the arch dir loads automatically - drop the glob, or resolve";
     say "  just the arch dir via \$Config{archname}.";
     return scalar @hits;
 }
 
-# scan_inc($text) — pure scanner. Returns [ { line, text }, ... ] for each
+# scan_inc($text) - pure scanner. Returns [ { line, text }, ... ] for each
 # line that globs the whole local/lib/perl5 tree onto @INC (a bare trailing
 # '*'). Arch-restricted globs ('*-linux*') and $Config{archname} resolution
 # are correct and not flagged.
@@ -108,7 +108,7 @@ sub scan_inc ($class, $text) {
   and reports any cert that doesn't match its hostname. Then audits every
   service repo's bin/*.pl for the fragile @INC glob (globbing the whole
   local/lib/perl5 tree onto @INC, which shadows core Config). Exit code is
-  non-zero when any check fails — wire it into a cron if you want alerts.
+  non-zero when any check fails - wire it into a cron if you want alerts.
 
   321 doctor             # check live
   321 doctor live        # explicit

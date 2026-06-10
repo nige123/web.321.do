@@ -16,7 +16,7 @@ sub run ($self, @args) {
 
         # Stop workers first (reverse sorted) so they settle before the main
         # process exits. No-op when $name resolves to a worker or to a main
-        # with no workers — cascade_workers returns [] in those cases.
+        # with no workers - cascade_workers returns [] in those cases.
         for my $row (@{ $self->cascade_workers($name, 'stop', $transport) }) {
             $self->print_worker_step('stop', $row);
         }
