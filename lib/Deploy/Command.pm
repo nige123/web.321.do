@@ -56,6 +56,21 @@ sub resolve_service ($self, $input) {
     die $msg;
 }
 
+# Names of every main (non-worker) service that runs locally - i.e. whose
+# manifest declares a dev target. This is the set `stop all` / `start all`
+# act on; live-only services are excluded so a fleet-wide local bounce can
+# never reach across to production.
+sub local_main_services ($self) {
+    my @names;
+    for my $name (@{ $self->config->service_names }) {
+        my $raw = $self->config->service_raw($name);
+        next unless $raw && $raw->{targets}{dev};   # not a local service
+        next if exists $raw->{_parent};             # worker, not a main
+        push @names, $name;
+    }
+    return [ @names ];
+}
+
 sub parse_target ($self, @args) {
     if (!@args) {
         # No args - try to infer service from cwd

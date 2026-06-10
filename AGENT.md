@@ -31,6 +31,7 @@ Run from `/home/s3/web.321.do`. Paths in this document are absolute.
 321 install <name> [target]     # explicit first-time bring-up (clone, deps, ubic, nginx, SSL, start)
 321 restart <name> [target]     # ubic restart; auto-regenerates ubic file if 321.yml is newer
 321 start | stop <name> [target]
+321 start all | stop all         # start/stop every local (dev-target) service at once
 321 logs <name> [target] [--stderr|--ubic] [-n 100]
 321 do [name] <target> <subcommand> [args]   # run the app's own Mojolicious subcommand at a target
 321 doctor [target]             # probe each non-localhost host's HTTPS cert, report mismatches; exits non-zero on failure
@@ -125,6 +126,8 @@ workers:                     # optional: each becomes <group>.<worker> service, 
 Naming a worker directly (`321 restart 123.minion`) only touches that worker — the escape hatch when a single worker needs cycling.
 
 Failed worker steps are reported but don't abort the cascade or the main step. A failed main step skips the worker pass.
+
+`321 stop all` / `321 start all` apply the same cascade across every **local** service at once — every service whose manifest declares a `dev` target, with its workers. Live-only services are deliberately skipped, so a fleet-wide bounce can never reach across to production. (There's no `stop all live`; act on live services by name.)
 
 ## Common gotchas
 

@@ -6,6 +6,8 @@ has description => 'Start a service';
 has usage => sub ($self) { $self->extract_usage };
 
 sub run ($self, @args) {
+    return $self->_start_all if @args == 1 && lc $args[0] eq 'all';
+
     my ($svc_input, $target) = $self->parse_target(@args);
     die $self->usage unless $svc_input;
     my @names = $self->resolve_service($svc_input);
@@ -13,18 +15,34 @@ sub run ($self, @args) {
 
     for my $name (@names) {
         my $transport = $self->transport_for($name, $target);
-        my $up = $self->_start_one($name, $target, $transport);
-
-        # Cascade worker starts only when the main service ended up running.
-        # No-op when $name is a worker or has no workers.
-        if ($up) {
-            for my $w (@{ $self->config->workers_of($name) }) {
-                $self->_start_one($w, $target, $transport);
-            }
-        }
+        $self->_start_with_workers($name, $target, $transport);
     }
 
     $self->_show_status($svc_input, $target);
+}
+
+# Start every local service (the dev target), each cascading to its workers.
+# Live-only services are deliberately left alone.
+sub _start_all ($self) {
+    my $target = 'dev';
+    $self->config->target($target);
+    say "Starting all local services ($target)...";
+    say "";
+    for my $name (@{ $self->local_main_services }) {
+        my $transport = $self->transport_for($name, $target);
+        $self->_start_with_workers($name, $target, $transport);
+    }
+    $self->_show_status(undef, $target);
+}
+
+# Start a main, then cascade to its workers only if the main came up. No-op
+# cascade when $name is a worker or has no workers.
+sub _start_with_workers ($self, $name, $target, $transport) {
+    my $up = $self->_start_one($name, $target, $transport);
+    return unless $up;
+    for my $w (@{ $self->config->workers_of($name) }) {
+        $self->_start_one($w, $target, $transport);
+    }
 }
 
 sub _show_status ($self, $svc_input, $target) {
@@ -85,9 +103,13 @@ sub _start_one ($self, $name, $target, $transport) {
 =head1 SYNOPSIS
 
   Usage: APPLICATION start <service>
+         APPLICATION start all
 
   Starts the named service. When the name is a main with workers
   declared in 321.yml, every worker is started after the main comes
   up. Naming a worker directly starts only that worker.
+
+  `start all` starts every local (dev-target) service, each cascading
+  to its workers. Live-only services are never touched.
 
 =cut
