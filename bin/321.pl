@@ -15,7 +15,7 @@ use Mojo::Util qw(decode);
 binmode STDOUT, ':encoding(UTF-8)';
 binmode STDERR, ':encoding(UTF-8)';
 
-app->config(hypnotoad => {listen => ['http://127.0.0.1:9321']});
+app->config(hypnotoad => {listen => ['http://127.0.0.1:9321'], accepts => 1000});
 unshift @{app->commands->namespaces}, 'Deploy::Command';
 
 my $app_home = $ENV{APP_HOME} // curfile->dirname->dirname;
