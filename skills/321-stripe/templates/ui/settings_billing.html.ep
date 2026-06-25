@@ -1,0 +1,44 @@
+%# 321-stripe skill template — billing block for accounts/settings.html.ep ; see SKILL.md
+%# Splice this inside the team-settings page. It assumes the controller passes
+%# $account (with billing_status, trial_ends_at, has_payment_method) and the
+%# boolean $can_manage_billing (owner/admin). Brand noun "FavSixes" -> your app's.
+    % if ($account->{kind} eq 'team') {
+    % my $status = $account->{billing_status} // 'free';
+    <hr style="margin: 2rem 0;">
+    <h2 id="billing">Billing</h2>
+    % if ($status eq 'trialing') {
+        % my $ends = $account->{trial_ends_at};
+        % $ends =~ s/\s.*\z// if $ends;   # show the date, drop the time
+        % if ($account->{has_payment_method}) {
+        <p>Trial ends <strong><%= $ends // '' %></strong>. Your card will be charged then.</p>
+        % } else {
+        <p>Trial ends <strong><%= $ends // '' %></strong>. Add a card to keep your private FavSixes.</p>
+        % }
+        % if ($can_manage_billing) {
+        <form method="POST" action="/@<%= $account->{handle} %>/billing/portal">
+            <button class="fa-btn" type="submit">Manage billing</button>
+        </form>
+        % }
+    % } elsif ($status eq 'active') {
+        <p>&pound;3 / active member / month.</p>
+        % if ($can_manage_billing) {
+        <form method="POST" action="/@<%= $account->{handle} %>/billing/portal">
+            <button class="fa-btn" type="submit">Manage billing</button>
+        </form>
+        % }
+    % } elsif ($status eq 'past_due') {
+        <p>Your last payment failed - update your card to avoid losing access.</p>
+        % if ($can_manage_billing) {
+        <form method="POST" action="/@<%= $account->{handle} %>/billing/portal">
+            <button class="fa-btn" type="submit">Update payment</button>
+        </form>
+        % }
+    % } else {
+        <p>Private team FavSixes need a plan. &pound;3 / active member / month.</p>
+        % if ($can_manage_billing) {
+        <form method="POST" action="/@<%= $account->{handle} %>/billing/trial">
+            <button class="fa-btn" type="submit">Start your 30-day free trial</button>
+        </form>
+        % }
+    % }
+    % }

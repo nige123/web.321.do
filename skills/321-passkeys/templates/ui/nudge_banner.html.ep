@@ -1,0 +1,13 @@
+<%# Drop into your default layout (e.g. just after the flash, before content).
+    Shows ONLY for signed-in users who have no passkey and haven't dismissed it
+    (the passkey_nudge helper). JS-gated via data-passkey-only so non-WebAuthn
+    browsers never see it. Reuse your own button classes. %>
+% if (passkey_nudge()) {
+<div class="fa-passkey-nudge" data-passkey-nudge data-passkey-only hidden role="status">
+    <span class="fa-passkey-nudge__text">Sign in faster next time - add a passkey.</span>
+    <span class="fa-passkey-nudge__actions">
+        <button type="button" class="fa-btn" data-passkey-register>Add a passkey</button>
+        <button type="button" class="fa-passkey-nudge__dismiss" data-passkey-dismiss>Not now</button>
+    </span>
+</div>
+% }

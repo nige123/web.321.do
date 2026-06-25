@@ -1,0 +1,5 @@
+-- 321-stripe skill template — port to <NS>:: app's sql/billing/ ; see SKILL.md
+INSERT INTO stripe_events (event_id, type)
+VALUES ([event_id], [type])
+ON CONFLICT (event_id) DO NOTHING
+RETURNING event_id

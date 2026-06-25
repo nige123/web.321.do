@@ -1,0 +1,5 @@
+-- 321-stripe skill template — port to <NS>:: app's sql/billing/ ; see SKILL.md
+SELECT account_id, kind, plan, billing_status, stripe_customer_id,
+       stripe_subscription_id, trial_ends_at, current_period_end
+  FROM accounts
+ WHERE account_id = [account_id]

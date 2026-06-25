@@ -1,5 +1,5 @@
 ---
-name: using-321
+name: 321-command
 description: Use when deploying, restarting, starting/stopping, checking status, or pulling logs for any 123.do-family service (api.123.do, web.321.do, tui.123.do, sibling project repos with a 321.yml). 321 is the canonical deploy tool — do not invoke ubic/morbo/systemctl/certbot directly.
 ---
 
@@ -44,10 +44,20 @@ Most `321` commands accept a prefix/substring (`321 status zorda` → `zorda.web
 | "Restart this service" (e.g. after editing 321.yml or config) | `321 restart 123.api [target]` |
 | "What's the status of …?" | `321 status 123.api [target]` |
 | "Why isn't it responding?" | `321 status <name>` then `321 logs <name> --stderr -n 50` |
+| "Show me the last N log lines from live" | `321 logs <name> live -n 200` (default 100, max 1000; one-shot, exits — agent-safe) |
+| "Live stderr from the last failure" | `321 logs <name> live --stderr -n 200` |
+| "Grep live logs for a phrase" | `321 logs <name> live --search=ERROR -n 50` |
 | "Privacy warning on https://X" | `321 doctor live` to confirm, `321 go X live` to auto-fix |
 | "First time setting up a new service" | Edit `<repo>/321.yml`, then `321 install <name>` (or `321 go` — auto-installs) |
 | "List everything" | `321 list` |
 | "I changed the port in 321.yml and dev didn't pick it up" | `321 restart <name>` — auto-regenerates the ubic file |
+| "Restart this service AND its minion/workers" | `321 restart <parent>` — cascades to workers in sorted name order |
+| "Cycle just one stuck worker" | `321 restart <parent>.<workerName>` — naming a worker directly skips the cascade |
+| "Bring the whole unit (web + workers) up/down" | `321 start <parent>` / `321 stop <parent>` — start cascades sorted, stop in reverse |
+| "Stop / start every local service at once" | `321 stop all` / `321 start all` — acts on all dev-target services (with workers); live-only services are skipped |
+| "Deploy and want workers on new code too" | `321 go <parent>` — main redeploys, workers bounced via `ubic restart` after |
+| "Run the app's own subcommand (e.g. create_admin) on live" | `321 do <name> live <subcommand> [args]` — reproduces the service's perl + env, over SSH |
+| "Run a Mojo subcommand from inside the repo" | `321 do <target> <subcommand> [args]` — service inferred from the cwd `321.yml` |
 
 ## The most useful commands
 
@@ -57,8 +67,13 @@ Most `321` commands accept a prefix/substring (`321 status zorda` → `zorda.web
 321 go <name> [target]          # deploy: install if first time, otherwise hot-restart
 321 restart <name> [target]     # ubic restart; auto-regenerates ubic file if 321.yml is newer
 321 start | stop <name> [target]
-321 logs <name> [target] [--stderr|--ubic] [-n 100]
-321 doctor [target]             # probe each non-localhost host's HTTPS cert
+321 stop all | start all        # stop/start every local (dev-target) service; skips live-only
+321 logs <name> [target] [--stderr|--ubic] [-n 100]   # one-shot snapshot, exits
+321 logs <name> [target] -f                            # tail -f (humans only — hangs until Ctrl-C)
+321 logs <name> [target] --search=TERM [-n 50]         # grep matches
+321 logs <name> [target] --analyse [-n 1000]           # error/warning summary
+321 do [name] <target> <subcmd> [args]                 # run the app's own Mojo subcommand at a target
+321 doctor [target]             # probe HTTPS certs + audit repos for the fragile @INC glob
 321 install <name> [target]     # explicit first-time bring-up
 321 nginx <name> [target] [--force]  # nginx + SSL setup
 321 generate                    # regenerate every ubic unit file from current manifests
@@ -73,7 +88,9 @@ Default target is `dev`. From inside a service repo with a `321.yml`, `321 go` i
 - **Don't** manually run `certbot`, `ubic`, `morbo`, `systemctl`, `nginx -s reload`, or `service <x> restart` on a managed service. Use `321 <command>`. The tooling encodes apt-deps, env-required checks, port probes, and cert flows you'll skip otherwise.
 - **Don't** edit `~/ubic/service/<group>/<name>` by hand. Edit `<repo>/321.yml` and run `321 restart` (or any restart auto-regenerates from the manifest).
 - **Don't** hand-roll `git pull && cpanm && ubic restart`. Use `321 go`.
-- **Confirm before destructive operations**: `git push --force`, `ubic destroy`, deleting `secrets/<name>.env`, removing a live nginx config. Reversible ops (deploy, restart, regenerate) don't need confirmation.
+- **Don't** SSH to the live box to run an app subcommand by hand (`ssh … perlbrew exec … perl bin/app.pl create_admin …`). Use `321 do <name> live <subcommand> [args]` — it reproduces the right perl, `MOJO_MODE`/`MOJO_CONFIG`, and repo-local libs, and is interactive (prompts work).
+- **Workers are part of the unit**: when a service has a `workers:` block (e.g. a minion worker), `321 <go|start|stop|restart> <parent>` cascades to every worker. Don't run `321 restart parent` then `ubic restart parent.worker` by hand — the cascade already did it. Name the worker directly only when you want it isolated.
+- **Confirm before destructive operations**: `git push --force`, `ubic destroy`, removing a live nginx config, deleting an app's config file. Reversible ops (deploy, restart, regenerate) don't need confirmation.
 - **Sibling repo edits**: when working in one service's repo, propose changes to other service repos as diffs — don't edit them directly unless the user explicitly asks.
 
 ## Diagnosis playbook
@@ -85,6 +102,7 @@ When a service is reported as broken:
 3. **If not running**: `321 logs <name> --ubic -n 50` to see why ubic failed to start it.
 4. **If a privacy warning on live**: `321 doctor live` confirms the cert mismatch; `321 go <name> live` auto-fixes via the post-deploy probe → nginx setup → certbot.
 5. **If editor saved a half-written file and morbo died**: a clean save fixes it; if morbo doesn't recover, `321 restart <name>`.
+6. **If a subcommand dies with `Global symbol "%Config" requires explicit package name` (e.g. via `321 do`) but the daemon runs fine**: the app's `bin/*.pl` globs every subdir of `local/lib/perl5` onto `@INC`, so a namespace dir (e.g. `HTTP/`) shadows core `Config.pm`. The daemon dodges it (hypnotoad loads `Config` early); subcommands don't. Run `321 doctor` to locate the offending file, then fix the app's entry script to resolve only the arch dir (`$Config{archname}`) instead of globbing the whole tree. `321 do` preloads core `Config` as a stopgap, but the app is still wrong.
 
 ## 321.yml manifest essentials
 

@@ -1,0 +1,5 @@
+INSERT INTO webauthn_credentials
+    (credential_id, user_id, public_key, sign_count, transports, aaguid, label)
+VALUES
+    ([credential_id], [user_id], [public_key], [sign_count], [transports], [aaguid], [label])
+RETURNING credential_id, user_id, label, created_at

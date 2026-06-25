@@ -1,0 +1,2 @@
+UPDATE users SET passkey_nudge_dismissed_at = now()
+WHERE user_id = [user_id] AND passkey_nudge_dismissed_at IS NULL

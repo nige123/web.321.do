@@ -1,0 +1,10 @@
+-- 321-stripe skill template — port to <NS>:: app's sql/billing/ ; see SKILL.md
+UPDATE accounts
+   SET plan                   = 'team',
+       billing_status         = 'trialing',
+       stripe_customer_id     = [customer_id],
+       stripe_subscription_id = [subscription_id],
+       trial_ends_at          = [trial_ends_at],
+       updated_at             = now()
+ WHERE account_id = [account_id] AND trial_ends_at IS NULL
+RETURNING account_id, plan, billing_status, trial_ends_at

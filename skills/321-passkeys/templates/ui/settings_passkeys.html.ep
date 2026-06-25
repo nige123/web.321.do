@@ -1,0 +1,30 @@
+<section class="fa-settings__section" id="passkeys">
+    <h2>Passkeys</h2>
+    <p>Sign in with Face ID, a fingerprint, or your device PIN. Your email code
+       still works as a backup.</p>
+
+    <button type="button" class="fa-btn" data-passkey-register data-passkey-only hidden>
+        Add a passkey
+    </button>
+    <p class="fa-passkey-note" data-passkey-fallback>Your browser does not support passkeys.</p>
+
+    % if (@{ $passkeys // [] }) {
+    <ul class="fa-passkey-list">
+        % for my $pk (@$passkeys) {
+        <li class="fa-passkey">
+            <span class="fa-passkey__label"><%= $pk->{label} || 'Passkey' %></span>
+            <span class="fa-passkey__meta">
+                added <%= substr($pk->{created_at} // '', 0, 10) %>
+                % if ($pk->{last_used_at}) {
+                · last used <%= substr($pk->{last_used_at}, 0, 10) %>
+                % }
+            </span>
+            <form method="POST" action="/passkeys/<%= $pk->{credential_id} %>/remove">
+                <input type="hidden" name="next" value="/@<%= $account->{handle} %>/settings#passkeys">
+                <button type="submit" class="fa-btn fa-btn--ghost fa-danger">Remove</button>
+            </form>
+        </li>
+        % }
+    </ul>
+    % }
+</section>

@@ -1,0 +1,16 @@
+% layout 'default';
+% title 'Add a passkey - FavSix';
+<section class="fa-card fa-card--narrow">
+    <h1>Add a passkey</h1>
+    <p>Skip the email code next time. Use Face ID, a fingerprint, or your
+       device PIN to sign in instantly. Your email still works as a backup.</p>
+    <div class="fa-modal__actions">
+        <button type="button" class="fa-btn fa-btn--lg"
+                data-passkey-register data-passkey-only data-done="<%= $home %>" hidden>
+            Add a passkey
+        </button>
+        <a class="fa-btn fa-btn--ghost" href="<%= $home %>">Skip for now</a>
+    </div>
+    <p class="fa-passkey-note" data-passkey-only hidden>You can add one later in Settings.</p>
+    <p class="fa-passkey-note" data-passkey-fallback>This browser does not support passkeys - your email code still signs you in.</p>
+</section>

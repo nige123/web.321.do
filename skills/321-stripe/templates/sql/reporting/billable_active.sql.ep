@@ -1,0 +1,21 @@
+-- 321-stripe skill template — port to <NS>:: app's sql/reporting/ ; see SKILL.md
+SELECT count(DISTINCT acts.user_id) AS n
+  FROM (
+        SELECT tc.user_id, f.account_id
+          FROM tile_clicks tc
+          JOIN favarrays f ON f.array_id = tc.array_id
+         WHERE tc.user_id IS NOT NULL
+           AND tc.created_at >= ([report_date]::date AT TIME ZONE 'Europe/London')
+           AND tc.created_at <  (([report_date]::date + 1) AT TIME ZONE 'Europe/London')
+        UNION ALL
+        SELECT s.user_id, f.account_id
+          FROM tile_form_submissions s
+          JOIN favarrays f ON f.array_id = s.array_id
+         WHERE s.user_id IS NOT NULL
+           AND s.created_at >= ([report_date]::date AT TIME ZONE 'Europe/London')
+           AND s.created_at <  (([report_date]::date + 1) AT TIME ZONE 'Europe/London')
+       ) acts
+  JOIN accounts a ON a.account_id = acts.account_id
+  JOIN account_members am
+       ON am.account_id = acts.account_id AND am.user_id = acts.user_id
+ WHERE a.billing_status IN ('trialing', 'active', 'past_due')

@@ -1,0 +1,18 @@
+%# 321-stripe skill template — trial-nudge banner block for layouts/default.html.ep ; see SKILL.md
+%# Splice inside your layout's <main>. Driven by the billing_banner helper (see
+%# web-wiring.pl section (b)). Reuses the passkey-nudge CSS classes; rename to
+%# your own if you don't have them.
+        % if (my $banner = billing_banner()) {
+        <div class="fa-passkey-nudge fa-billing-nudge" data-billing-nudge role="status">
+            <span class="fa-passkey-nudge__text"><%= $banner->{message} %></span>
+            <span class="fa-passkey-nudge__actions">
+                <form method="post" action="/@<%= $banner->{handle} %>/billing/portal">
+                    <button type="submit" class="fa-btn"><%= $banner->{action_label} %></button>
+                </form>
+                <form method="post" action="/billing/nudge/dismiss">
+                    <input type="hidden" name="return" value="<%= $c->req->url->path->to_string %>">
+                    <button type="submit" class="fa-passkey-nudge__dismiss">Not now</button>
+                </form>
+            </span>
+        </div>
+        % }

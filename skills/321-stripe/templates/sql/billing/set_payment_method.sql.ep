@@ -1,0 +1,6 @@
+-- 321-stripe skill template — port to <NS>:: app's sql/billing/ ; see SKILL.md
+UPDATE accounts
+   SET has_payment_method = accounts.has_payment_method OR COALESCE([has]::boolean, false),
+       updated_at         = now()
+ WHERE stripe_customer_id = [customer_id]
+RETURNING account_id, has_payment_method

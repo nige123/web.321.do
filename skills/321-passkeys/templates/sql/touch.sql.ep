@@ -1,0 +1,4 @@
+UPDATE webauthn_credentials
+SET sign_count = [sign_count], last_used_at = now()
+WHERE credential_id = [credential_id]
+RETURNING credential_id

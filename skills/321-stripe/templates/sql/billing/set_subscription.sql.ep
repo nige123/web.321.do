@@ -1,0 +1,18 @@
+-- 321-stripe skill template — port to <NS>:: app's sql/billing/ ; see SKILL.md
+UPDATE accounts
+   SET billing_status         = [billing_status],
+       -- a NULL from the caller means "this event carries no such field":
+       -- keep what we have rather than clobbering it (invoice.* events have
+       -- no subscription object; a failed payment keeps the period boundary)
+       stripe_subscription_id = COALESCE([subscription_id], stripe_subscription_id),
+       current_period_end     = COALESCE([current_period_end], current_period_end),
+       trial_ends_at          = COALESCE([trial_ends_at], trial_ends_at),
+       -- sticky / monotonic: once true it stays true. A present 'true' turns it
+       -- on; a NULL bind or 'false' OR-s in false, preserving the existing value
+       -- (so a subscription event lacking a sub-level card never wipes a
+       -- customer-level true set via customer.updated). Card removal is handled
+       -- by the past_due messaging path, not by clearing this flag.
+       has_payment_method     = accounts.has_payment_method OR COALESCE([has_payment_method]::boolean, false),
+       updated_at             = now()
+ WHERE stripe_customer_id = [customer_id]
+RETURNING account_id, billing_status

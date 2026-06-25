@@ -1,0 +1,6 @@
+-- 321-stripe skill template — port to <NS>:: app's sql/billing/ ; see SKILL.md
+UPDATE accounts
+   SET billing_status = [billing_status],
+       updated_at     = now()
+ WHERE stripe_customer_id = [customer_id]
+RETURNING account_id, billing_status

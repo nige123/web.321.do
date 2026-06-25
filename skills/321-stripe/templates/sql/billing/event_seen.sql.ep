@@ -1,0 +1,2 @@
+-- 321-stripe skill template — port to <NS>:: app's sql/billing/ ; see SKILL.md
+SELECT 1 AS seen FROM stripe_events WHERE event_id = [event_id]

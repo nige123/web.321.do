@@ -1,0 +1,8 @@
+<%# Drop into your sign-in template, above the email form. Hidden until the JS
+    confirms WebAuthn support (data-passkey-only), so non-WebAuthn browsers
+    only ever see the email form. Reuse your own button classes. %>
+<button type="button" class="fa-btn fa-btn--ghost fa-btn--lg"
+        data-passkey-login data-passkey-only hidden>
+    Sign in with a passkey
+</button>
+<p class="fa-auth__or" data-passkey-only hidden>or use your email</p>

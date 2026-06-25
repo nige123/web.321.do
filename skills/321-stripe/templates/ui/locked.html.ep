@@ -1,0 +1,19 @@
+%# 321-stripe skill template — the "paused / locked feature" page ; see SKILL.md
+%# Rendered when a team views a private feature it is not entitled to. Controller
+%# passes $handle and the boolean $can_admin. Brand noun "FavSix" -> your app's.
+% layout 'default';
+% title 'This FavSix is paused';
+<section class="fa-card">
+    <h1>This FavSix is paused</h1>
+    <p>Private team FavSixes need an active plan.
+       <strong>@<%= $handle %></strong> isn't on a free trial or a paid plan
+       right now, so this one is paused.</p>
+    % if ($can_admin) {
+    <p>You manage this team - start a free trial or choose a plan to switch it
+       back on.</p>
+    <a class="fa-btn" href="/@<%= $handle %>/settings#billing">Manage billing</a>
+    % } else {
+    <p>Ask a team admin to start a free trial or choose a plan to switch it back
+       on.</p>
+    % }
+</section>
