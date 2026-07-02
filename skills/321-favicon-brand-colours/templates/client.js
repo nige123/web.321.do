@@ -6,6 +6,11 @@
 //
 // `applyHex(hex)` is yours: paint the preview + the "auto" swatch + the hidden
 // colour input. Keep a `userPicked` flag so an explicit swatch click wins.
+//
+// NOTE: this only covers the rich editor (it needs a `blur`). Any create path
+// WITHOUT this JS - a bookmarklet, an API call, a plain server-rendered form -
+// must call `dominant_colour($url)` server-side at create time, or every row it
+// makes lands on the palette default. See SKILL.md "Non-JS create paths".
 
 function suggestColourFromFavicon(opts) {
     if (opts.userPicked()) return;

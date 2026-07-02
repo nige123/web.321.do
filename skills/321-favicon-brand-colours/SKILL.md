@@ -67,6 +67,17 @@ Imager/HSL logic ports, the endpoint/JS are Mojo-shaped).
 - **Client** (`templates/client.js`): on the destination field's `blur`, fetch
   the colour and apply it to the preview/swatch - unless the user already picked
   one. A `#` value is a favicon colour; `null` means let the default stand.
+- **Non-JS create paths derive server-side (bookmarklet / API / plain forms).**
+  The client fetch only fires on a `blur` in the rich editor. ANY other path
+  that creates a coloured row - a "save this page" bookmarklet, an API endpoint,
+  a server-rendered form with no JS - has no blur, so it MUST call
+  `dominant_colour($url)` itself at create time and store the result. Skip this
+  and every row saved that way silently lands on the palette default (the bug
+  that shipped: a bookmarklet-saved page with a green favicon stored as the
+  default amber). Do the fetch in the **controller**, never the model - a model
+  that reaches the network would try to fetch favicons during unit tests. On
+  undef, the model's default still applies, so the only change is "derive first,
+  default second".
 - **Store**: validate `^#[0-9a-f]{6}$`, keep it sticky on the row, and when the
   extractor returns undef assign a brand default (e.g. a palette colour by
   position so it never shifts on reorder).
