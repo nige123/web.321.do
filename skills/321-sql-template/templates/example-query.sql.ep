@@ -1,0 +1,28 @@
+%# sql/tile_clicks/recent.sql.ep
+%#
+%# Recent clicks for an array. Demonstrates every feature at once:
+%#   - repeated bind          : [array_id] appears twice, binds twice
+%#   - optional filter        : the tile_id clause only when defined
+%#   - windowed date range    : trailing-days window when defined
+%#   - value-bound LIMIT       : even the limit is a [bind], not <%= %>
+%#   - allowlisted identifier : sort direction via <%= %> (validated in Perl)
+%#
+%# Caller (see usage.pl):
+%#   { array_id => $id, tile_id => undef, days => 7, dir => 'desc', limit => 5 }
+%#
+%# Every user value is a [bind]. Only $dir is interpolated, and only because
+%# the caller reduced it to a fixed 'ASC'/'DESC' before it got here.
+SELECT c.tile_id,
+       c.source,
+       c.created_at
+  FROM tile_clicks c
+ WHERE c.array_id = [array_id]
+% if (defined $tile_id) {
+   AND c.tile_id = [tile_id]
+% }
+% if (defined $days) {
+   AND c.created_at >= now() - ([days] * interval '1 day')
+% }
+   AND EXISTS (SELECT 1 FROM favarrays f WHERE f.array_id = [array_id])
+ ORDER BY c.created_at <%= $dir eq 'asc' ? 'ASC' : 'DESC' %>
+ LIMIT [limit]
