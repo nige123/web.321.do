@@ -1,0 +1,7 @@
+-- Every account the user belongs to (personal + teams), newest first — the
+-- data behind a header account-switcher or a post-login dashboard.
+SELECT a.account_id, a.handle, a.kind, a.display_name, m.role
+FROM account_members m
+JOIN accounts a USING (account_id)
+WHERE m.user_id = [user_id]
+ORDER BY (a.kind = 'personal') DESC, a.created_at ASC

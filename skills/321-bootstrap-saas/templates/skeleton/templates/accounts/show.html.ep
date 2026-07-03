@@ -1,0 +1,12 @@
+% layout 'default';
+% title '@' . $account->{handle};
+<section class="card">
+    <h1>@<%= $account->{handle} %></h1>
+    % if ($account->{display_name}) {
+    <p class="account__name"><%= $account->{display_name} %></p>
+    % }
+    % if ($account->{bio}) {
+    <p><%= $account->{bio} %></p>
+    % }
+    <p class="account__kind"><%= $account->{kind} %> account</p>
+</section>

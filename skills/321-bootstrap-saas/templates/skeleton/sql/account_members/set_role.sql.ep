@@ -1,0 +1,3 @@
+UPDATE account_members SET role = [role]
+ WHERE account_id = [account_id] AND user_id = [user_id]
+RETURNING *

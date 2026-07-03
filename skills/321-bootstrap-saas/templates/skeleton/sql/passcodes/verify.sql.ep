@@ -1,0 +1,17 @@
+-- Atomically consume the newest live passcode for this email. FOR UPDATE +
+-- the consumed_at write make a code single-use even under concurrent submits.
+WITH target AS (
+    SELECT passcode_id FROM passcodes
+    WHERE email = [email]
+    AND code = [code]
+    AND consumed_at IS NULL
+    AND expires_at > now()
+    ORDER BY created_at DESC
+    LIMIT 1
+    FOR UPDATE
+)
+UPDATE passcodes p
+SET consumed_at = now()
+FROM target t
+WHERE p.passcode_id = t.passcode_id
+RETURNING p.email

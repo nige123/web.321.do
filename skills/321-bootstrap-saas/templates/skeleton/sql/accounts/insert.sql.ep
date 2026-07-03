@@ -1,0 +1,4 @@
+INSERT INTO accounts (handle, kind, owner_user_id, display_name)
+VALUES ([handle], [kind], [owner_user_id], [display_name])
+RETURNING account_id, handle, kind, owner_user_id, display_name, bio,
+          avatar_url, created_at, updated_at

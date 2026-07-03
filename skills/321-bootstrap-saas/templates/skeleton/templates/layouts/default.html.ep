@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title><%= title || 'l2d' %></title>
+    <link rel="icon" href="/favicon.ico">
+    <link rel="stylesheet" href="/css/app.css?v=1">
+</head>
+<body>
+    <header class="nav">
+        <a class="nav__brand" href="/">l2d</a>
+        <nav class="nav__links">
+        % if (current_user()) {
+            <span class="nav__email"><%= current_user()->{email} %></span>
+            <form method="post" action="/signout" class="nav__inline">
+                <button class="btn btn--ghost" type="submit">Sign out</button>
+            </form>
+        % } else {
+            <a class="nav__link" href="/signin">Sign in</a>
+            <a class="btn" href="/signup">Get started</a>
+        % }
+        </nav>
+    </header>
+    <main class="shell">
+        % if (my $notice = flash 'notice') {
+        <div class="flash" role="status"><%= $notice %></div>
+        % }
+        <%= content %>
+    </main>
+    <footer class="foot">
+        <p>&copy; l2d</p>
+    </footer>
+    <script src="/js/app.js?v=1" defer></script>
+</body>
+</html>

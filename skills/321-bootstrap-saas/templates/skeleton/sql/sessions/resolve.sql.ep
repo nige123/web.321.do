@@ -1,0 +1,7 @@
+SELECT s.session_id, s.user_id, s.expires_at, u.email
+FROM sessions s
+JOIN users u USING (user_id)
+WHERE s.session_token_hash = [session_token_hash]
+AND s.revoked_at IS NULL
+AND s.expires_at > now()
+LIMIT 1

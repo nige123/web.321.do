@@ -1,0 +1,2 @@
+SELECT account_id, handle FROM accounts
+ WHERE owner_user_id = [user_id] AND kind = 'personal'

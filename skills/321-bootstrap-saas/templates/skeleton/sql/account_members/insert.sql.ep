@@ -1,0 +1,4 @@
+INSERT INTO account_members (account_id, user_id, role)
+VALUES ([account_id], [user_id], [role])
+ON CONFLICT (account_id, user_id) DO NOTHING
+RETURNING *

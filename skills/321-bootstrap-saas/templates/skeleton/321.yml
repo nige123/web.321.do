@@ -1,0 +1,35 @@
+# 321.yml — service manifest. `321 go` reads this to deploy dev/live.
+# Rename `l2d` throughout to your service slug. See the 321-command skill.
+name: l2d.web
+entry: bin/l2d
+runner: hypnotoad
+perl: perl-5.42.0
+health: /health
+branch: main
+# Pin project-local deps for the test gate, same as the runtime — ambient
+# perlbrew site_perl can drift (e.g. a stale Mojo::Pg) and must not decide
+# whether a deploy ships.
+test: PERL5LIB=local/lib/perl5 prove -lr t
+repo: git@github.com:you/app.l2d.example.git
+
+dev:
+    host: l2d.example.dev
+    port: 8500
+    runner: morbo
+
+live:
+    host: l2d.example
+    port: 8500
+    runner: hypnotoad
+    ssh: ubuntu@your-live-box
+    ssh_key: ~/.ssh/your-key.pem
+
+env_required:
+    MOJO_MODE: "production or development"
+
+# Background workers become their own ubic services named {group}.{key},
+# so this is l2d.minion alongside l2d.web. `321 restart l2d.web`
+# cascades to it.
+workers:
+    minion:
+        cmd: bin/l2d minion worker

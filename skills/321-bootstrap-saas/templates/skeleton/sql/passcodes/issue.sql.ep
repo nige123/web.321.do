@@ -1,0 +1,11 @@
+-- Abuse guard: cap how many passcodes one email can request per day so the
+-- sign-in form can't be weaponised to flood a victim's inbox. 100/day leaves
+-- ample room for legitimate retries (and test sign-ins) while bounding abuse.
+INSERT INTO passcodes (email, code, expires_at)
+SELECT [email], [code], now() + interval '10 minutes'
+WHERE (
+    SELECT count(*) FROM passcodes
+    WHERE email = [email]
+    AND created_at > now() - interval '1 day'
+) < 100
+RETURNING passcode_id, code, expires_at

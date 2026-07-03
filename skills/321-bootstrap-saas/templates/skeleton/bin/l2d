@@ -1,0 +1,24 @@
+#!/usr/bin/env perl
+use strict;
+use warnings;
+use FindBin;
+
+BEGIN {
+    unshift @INC, "$FindBin::Bin/../lib";
+    # Project-local deps only. Do NOT glob every subdir of local/lib/perl5 onto
+    # @INC — a namespace dir (e.g. HTTP/) then shadows core Config.pm and every
+    # `321 do` subcommand dies with "Global symbol %Config". The daemon dodges
+    # it; subcommands don't. See references/gotchas.md.
+    unshift @INC, "$FindBin::Bin/../local/lib/perl5";
+}
+
+$ENV{MOJO_HOME}   //= "$FindBin::Bin/..";
+$ENV{MOJO_MODE}   //= 'development';
+$ENV{MOJO_CONFIG} //= "$FindBin::Bin/../conf/$ENV{MOJO_MODE}.conf";
+
+# TLS terminates at nginx; trust its X-Forwarded-Proto so req->is_secure and
+# generated URLs are https. The app only listens on loopback, so this is safe.
+$ENV{MOJO_REVERSE_PROXY} //= 1;
+
+require Mojolicious::Commands;
+Mojolicious::Commands->start_app('L2D::Web');

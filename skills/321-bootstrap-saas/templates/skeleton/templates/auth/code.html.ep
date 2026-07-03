@@ -1,0 +1,18 @@
+% layout 'default';
+% title 'Enter your code';
+<section class="card card--narrow">
+    <h1>Enter your code</h1>
+    <p>We sent a 6-digit code to <strong><%= $email %></strong>.</p>
+    % if ($error) {
+    <p class="error"><%= $error %></p>
+    % }
+    <form method="POST" action="/signin/code">
+        <label>6-digit code
+            <input type="text" name="code" inputmode="numeric"
+                   pattern="[0-9]{6}" maxlength="6" required autofocus
+                   autocomplete="one-time-code">
+        </label>
+        <button class="btn" type="submit">Sign in</button>
+    </form>
+    <p class="card__alt"><a href="/signin">Use a different email</a></p>
+</section>

@@ -1,0 +1,5 @@
+SELECT m.user_id, m.role, m.created_at, u.email
+FROM account_members m
+JOIN users u USING (user_id)
+WHERE m.account_id = [account_id]
+ORDER BY m.created_at ASC

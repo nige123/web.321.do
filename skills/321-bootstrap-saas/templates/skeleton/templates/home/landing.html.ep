@@ -1,0 +1,10 @@
+% layout 'default';
+% title 'l2d';
+<section class="hero">
+    <h1>l2d</h1>
+    <p class="hero__lead">A calm SSR SaaS baseline. Replace this with your product.</p>
+    <p class="hero__cta">
+        <a class="btn btn--lg" href="/signup">Get started</a>
+        <a class="btn btn--ghost btn--lg" href="/signin">Sign in</a>
+    </p>
+</section>

@@ -1,0 +1,2 @@
+SELECT role FROM account_members
+ WHERE account_id = [account_id] AND user_id = [user_id]

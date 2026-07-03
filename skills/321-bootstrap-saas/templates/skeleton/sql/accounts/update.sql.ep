@@ -1,0 +1,7 @@
+UPDATE accounts
+SET display_name = [display_name],
+    bio          = [bio],
+    avatar_url   = [avatar_url],
+    updated_at   = now()
+WHERE account_id = [account_id]
+RETURNING *
