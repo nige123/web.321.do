@@ -10,7 +10,11 @@ branch: main
 # perlbrew site_perl can drift (e.g. a stale Mojo::Pg) and must not decide
 # whether a deploy ships.
 test: PERL5LIB=local/lib/perl5 prove -lr t
-repo: git@github.com:you/app.l2d.example.git
+# CHANGE-ME is deliberately sed-proof: it shares no substring with your
+# domain or slug, so a bulk rename can never half-rewrite it into a
+# plausible-looking wrong value. Live deploys clone from this EXACT URL -
+# set it by hand, then run the residue gate:  grep -rn CHANGE-ME .
+repo: git@github.com:CHANGE-ME/CHANGE-ME.git
 
 dev:
     host: l2d.example.dev
@@ -21,8 +25,8 @@ live:
     host: l2d.example
     port: 8500
     runner: hypnotoad
-    ssh: ubuntu@your-live-box
-    ssh_key: ~/.ssh/your-key.pem
+    ssh: ubuntu@CHANGE-ME
+    ssh_key: ~/.ssh/CHANGE-ME.pem
 
 env_required:
     MOJO_MODE: "production or development"

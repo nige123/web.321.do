@@ -70,8 +70,17 @@ t/…                         Test::L2D harness + 00-load, 01-migration, 02-auth
    mv t/lib/Test/L2D.pm t/lib/Test/YourNs.pm
    # optionally rename bin/l2d -> bin/yourslug and update 321.yml `entry:`+worker cmd
    ```
-   Review the diff — pick real hosts/ports/ssh in `321.yml`, a real
-   `db_connect_string`, and fresh `cookie_secrets`.
+   Review the diff — pick real hosts/ports in `321.yml`, a real
+   `db_connect_string`, and fresh `cookie_secrets`. Then set the three
+   `CHANGE-ME` values in `321.yml` by hand (`repo:`, `ssh:`, `ssh_key:`) —
+   they are deliberately sed-proof so a bulk rename cannot half-rewrite them.
+   **Residue gate (mandatory before the first deploy):**
+   ```bash
+   grep -rn CHANGE-ME . --exclude-dir=local && echo "STOP: placeholders remain"
+   ```
+   A compound placeholder that shares a substring with your domain WILL be
+   half-rewritten by rename seds into something that looks right and fails
+   much later (see gotchas: the `you/` clone failure).
 
 3. **Install deps into a project-local lib** (never rely on ambient site_perl —
    see gotchas): `cpanm -L local --installdeps .`

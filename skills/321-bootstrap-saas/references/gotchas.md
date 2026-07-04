@@ -101,3 +101,27 @@ With `postmark_server_token` empty (dev + tests), `L2D::Email::Sender` logs
 `[email:log] to=… code=…` instead of calling Postmark and returns success. That
 is intended — sign-in works with zero email infra. Don't mistake the log line for
 a failure; grep it for the code when testing sign-in locally.
+
+## Placeholder residue: the half-rewritten repo URL
+
+The skeleton's manifest once shipped `repo: git@github.com:you/app.l2d.example.git`.
+A bulk rename (`sed s/l2d.example/yourdomain/`) rewrote the DOMAIN inside that
+URL first, producing `git@github.com:you/app.yourdomain.git` - which *looks*
+configured, passes every local test, deploys fine to dev, and then fails at
+the FIRST LIVE DEPLOY with GitHub's misleading "Repository not found" (the
+live box clones from the manifest URL; user `you` owns nothing). Cost: a live
+launch stalled on a one-character-class bug.
+
+Two defences, both now baked in:
+
+1. **Sed-proof sentinels.** Values that must be set by hand (`repo:`, `ssh:`,
+   `ssh_key:`) use the token `CHANGE-ME`, chosen to share no substring with
+   any domain or slug - no rename can partially rewrite it into something
+   plausible.
+2. **The residue gate.** Before the first deploy:
+   `grep -rn CHANGE-ME . --exclude-dir=local` must print nothing. Run it even
+   if you are sure; the whole failure mode is that the file *looks* right.
+
+General rule when renaming any skeleton: never embed one placeholder inside
+another (a URL containing the example domain is two placeholders in one
+string), and always end a rename with a residue grep for every sentinel.
