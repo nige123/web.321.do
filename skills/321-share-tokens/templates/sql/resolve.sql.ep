@@ -1,0 +1,9 @@
+-- Resolve a raw share token (looked up by its sha256 hash) to a live row.
+-- Revoked or expired tokens resolve to nothing.
+SELECT share_token_id, resource_type, resource_id, created_by_user_id,
+       permission, expires_at, created_at
+FROM share_tokens
+WHERE token_hash = [token_hash]
+AND revoked_at IS NULL
+AND (expires_at IS NULL OR expires_at > now())
+LIMIT 1

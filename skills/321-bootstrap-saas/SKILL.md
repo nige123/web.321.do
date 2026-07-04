@@ -125,6 +125,10 @@ and shapes** stable — that is the contract.
   survives the request and retries with backoff.
 - **`321` owns deploy.** `bin/l2d` behind hypnotoad + nginx; never invoke
   ubic/morbo/certbot directly.
+- **No en- or em-dashes, anywhere.** House copy rule: never use `–`, `—`,
+  `&ndash;` or `&mdash;` in templates, code comments, user-facing copy, README
+  or commit messages - write a plain hyphen (" - ") instead. Typographic
+  middots as brand marks are fine; long dashes are not.
 
 ## Verify
 

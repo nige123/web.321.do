@@ -1,0 +1,5 @@
+-- Ownership check before sharing a Love2.
+SELECT profile_id
+FROM love_profiles
+WHERE profile_id = [resource_id]
+AND user_id = [user_id]

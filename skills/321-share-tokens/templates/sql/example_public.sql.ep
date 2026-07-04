@@ -1,0 +1,5 @@
+-- Public share projection of a Love2: title, summary and the flower
+-- ONLY — never the raw question answers.
+SELECT profile_id, title, summary, flower_json
+FROM love_profiles
+WHERE profile_id = [profile_id]

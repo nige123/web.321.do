@@ -1,0 +1,4 @@
+INSERT INTO share_tokens (token_hash, resource_type, resource_id, created_by_user_id)
+VALUES ([token_hash], [resource_type], [resource_id], [created_by_user_id])
+RETURNING share_token_id, resource_type, resource_id, created_by_user_id,
+          permission, expires_at, revoked_at, created_at
