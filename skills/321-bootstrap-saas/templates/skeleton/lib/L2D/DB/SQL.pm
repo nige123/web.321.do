@@ -1,9 +1,10 @@
+# Copyright Nige Ltd. Author: Nigel Hamilton.
 package L2D::DB::SQL;
 
 #------------------------------------------------------------------------------
 # Runtime SQL template renderer. Two layers: (1) Mojo::Template renders the file
 # (so authors get <% if %> for optional clauses), then (2) a [bind] pass
-# rewrites each [name] to a `?` and collects the value — so the driver
+# rewrites each [name] to a `?` and collects the value - so the driver
 # parameterizes it and injection is impossible. Documented by 321-sql-template.
 #------------------------------------------------------------------------------
 

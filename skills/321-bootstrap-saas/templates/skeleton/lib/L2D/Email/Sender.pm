@@ -1,8 +1,9 @@
+# Copyright Nige Ltd. Author: Nigel Hamilton.
 package L2D::Email::Sender;
 
 #------------------------------------------------------------------------------
 # Deliver transactional email via Postmark. With NO server token configured the
-# message is LOGGED instead of sent — so sign-in works in development and tests
+# message is LOGGED instead of sent - so sign-in works in development and tests
 # with no email infrastructure. Called only from a Minion worker (the blocking
 # POST needs a process that outlives the request).
 #------------------------------------------------------------------------------
@@ -68,7 +69,7 @@ sub _send ($self, $to, $subject, $html, $log_hint = undef) {
     my $log   = $self->log;
     my $start = Time::HiRes::time();
 
-    # Blocking call — correct inside a Minion task body (the worker is the right
+    # Blocking call - correct inside a Minion task body (the worker is the right
     # place to wait). A non-blocking variant from a controller would be torn
     # down on return before Postmark replied.
     my $tx = $self->ua->post(

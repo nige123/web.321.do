@@ -138,11 +138,22 @@ and shapes** stable — that is the contract.
   `&ndash;` or `&mdash;` in templates, code comments, user-facing copy, README
   or commit messages - write a plain hyphen (" - ") instead. Typographic
   middots as brand marks are fine; long dashes are not.
+- **Every source file opens with the copyright header.**
+  `# Copyright Nige Ltd. Author: Nigel Hamilton.` is line 1 of every Perl
+  module, script, test and conf file (line 2 under a shebang); `/* ... */`
+  form in CSS, `// ...` form in JS. The skeleton ships it everywhere; every
+  source file you ADD to the app carries it too. (SQL templates and .html.ep
+  partials are exempt - house practice keeps those header-free.)
 
 ## Verify
 
 - `prove -lr -It/lib t` green (the 3 base tests exercise health, migration, and
   the end-to-end passcode sign-in that sets the session cookie).
+- Copyright-header gate (run from the repo root; also rerun it before any
+  later commit that adds source files):
+  ```bash
+  grep -rL 'Copyright Nige Ltd' lib bin t conf public && echo "STOP: header missing"
+  ```
 - `bin/l2d get /health` prints `ok`.
 - Sign up in a browser, grep the log for the passcode, enter it, land on
   `/@yourhandle`.

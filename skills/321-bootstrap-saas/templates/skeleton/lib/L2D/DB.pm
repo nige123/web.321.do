@@ -1,10 +1,11 @@
+# Copyright Nige Ltd. Author: Nigel Hamilton.
 package L2D::DB;
 
 #------------------------------------------------------------------------------
 # Per-request database wrapper. Resolves a 'group/name' key to the SQL template
 # sql/<group>/<name>.sql.ep, renders it, and executes it on this request's
 # Mojo::Pg::Database. This is the engine documented by the 321-sql-template
-# skill — read that skill for the full design and gotchas.
+# skill - read that skill for the full design and gotchas.
 #------------------------------------------------------------------------------
 
 use Mojo::Base -base, -signatures;

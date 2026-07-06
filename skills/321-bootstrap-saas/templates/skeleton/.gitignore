@@ -6,5 +6,5 @@ var/
 *.swp
 .DS_Store
 
-# Per-host secrets (Stripe keys, Postmark token, etc.) — never committed.
+# Per-host secrets (Stripe keys, Postmark token, etc.) - never committed.
 conf/secrets.local.conf

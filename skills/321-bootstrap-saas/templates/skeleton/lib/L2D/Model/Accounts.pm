@@ -1,3 +1,4 @@
+# Copyright Nige Ltd. Author: Nigel Hamilton.
 package L2D::Model::Accounts;
 
 #------------------------------------------------------------------------------

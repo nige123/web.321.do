@@ -1,4 +1,5 @@
 #!/usr/bin/env perl
+# Copyright Nige Ltd. Author: Nigel Hamilton.
 use strict;
 use warnings;
 use FindBin;
@@ -6,7 +7,7 @@ use FindBin;
 BEGIN {
     unshift @INC, "$FindBin::Bin/../lib";
     # Project-local deps only. Do NOT glob every subdir of local/lib/perl5 onto
-    # @INC — a namespace dir (e.g. HTTP/) then shadows core Config.pm and every
+    # @INC - a namespace dir (e.g. HTTP/) then shadows core Config.pm and every
     # `321 do` subcommand dies with "Global symbol %Config". The daemon dodges
     # it; subcommands don't. See references/gotchas.md.
     unshift @INC, "$FindBin::Bin/../local/lib/perl5";

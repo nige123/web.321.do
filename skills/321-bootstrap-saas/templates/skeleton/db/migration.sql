@@ -1,5 +1,5 @@
 -- Mojo::Pg migration. Numbered "-- N up" blocks, applied in order by
--- auto_migrate(1) on first DB use. NEVER edit a shipped block — add the next
+-- auto_migrate(1) on first DB use. NEVER edit a shipped block - add the next
 -- "-- N up". There are no "down" blocks by design.
 --
 -- This is the AXS identity core. Feature skills append the next blocks:
@@ -17,7 +17,7 @@ CREATE TABLE users (
 );
 
 -- single-use email sign-in passcodes. `code` is the sha256 hex of the 6-digit
--- code — the plaintext code only ever exists in the email and in memory.
+-- code - the plaintext code only ever exists in the email and in memory.
 CREATE TABLE passcodes (
     passcode_id BIGSERIAL PRIMARY KEY,
     email       TEXT NOT NULL,

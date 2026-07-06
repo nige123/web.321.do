@@ -2,7 +2,7 @@
 % title 'Get started';
 <section class="card card--narrow">
     <h1>Get started</h1>
-    <p>Pick a handle — it's your public address: <code>/@yourhandle</code>.</p>
+    <p>Pick a handle - it's your public address: <code>/@yourhandle</code>.</p>
     % if ($error) {
     <p class="error"><%= $error %></p>
     % }

@@ -1,10 +1,11 @@
+# Copyright Nige Ltd. Author: Nigel Hamilton.
 package L2D::Web;
 
 #------------------------------------------------------------------------------
 # Mojolicious application class. Wires config, database + migrations, Minion,
 # request helpers (current_user / start_session_for / db / email_sender) and
 # routes. This is the seam every feature skill (passkeys, stripe, sql-template)
-# hooks into — keep the helper names and shapes stable.
+# hooks into - keep the helper names and shapes stable.
 #------------------------------------------------------------------------------
 
 use Mojo::Base 'Mojolicious', -signatures;
@@ -83,7 +84,7 @@ sub _setup_minion ($self) {
         $job->app->email_sender->send_passcode($to, $code);
     });
 
-    # Feature skills register more tasks here — e.g. 321-stripe adds the
+    # Feature skills register more tasks here - e.g. 321-stripe adds the
     # `stripe_event` (webhook processor) and `stripe_report_usage` tasks.
 
     return $self;
@@ -110,7 +111,7 @@ sub _setup_helpers ($self) {
     });
 
     # start_session_for: mint a DB session for a user and set the signed cookie.
-    # The ONE place login is established — the passcode flow uses it, and the
+    # The ONE place login is established - the passcode flow uses it, and the
     # 321-passkeys login ceremony reuses it verbatim.
     $self->helper(start_session_for => sub ($c, $user_id) {
         my $session = L2D::Auth::Sessions->new(db => $c->db)->create($user_id);
@@ -126,7 +127,7 @@ sub _setup_helpers ($self) {
     });
 
     # email_sender: dual-callable (controller or app/job). Inert (logs instead
-    # of sending) whenever postmark_server_token is empty — so dev + tests never
+    # of sending) whenever postmark_server_token is empty - so dev + tests never
     # touch the network.
     $self->helper(email_sender => sub ($c_or_app) {
         my $app = $c_or_app->can('app') ? $c_or_app->app : $c_or_app;
@@ -162,7 +163,7 @@ sub _setup_routes ($self) {
     $r->post('/signin/code')->to('Auth#code_submit');
     $r->post('/signout')->to('Auth#signout');
 
-    # public account page — keep LAST of the top-level GETs so literal paths win
+    # public account page - keep LAST of the top-level GETs so literal paths win
     $r->get('/@:handle')->to('Accounts#show');
 
     # authenticated area: everything under $auth requires a signed-in user

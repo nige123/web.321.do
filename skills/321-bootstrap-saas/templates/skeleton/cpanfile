@@ -2,7 +2,7 @@
 # local/lib/perl5 (cpanm -L local) so the app and its `321` test gate use these
 # exact versions, never a drifted ambient perlbrew site_perl.
 requires 'Mojolicious', '>= 9.46';
-requires 'Mojo::Pg',    '>= 5.0';   # Minion::Backend::Pg needs Mojo::Pg 5 — older site_perl 4.x won't load
+requires 'Mojo::Pg',    '>= 5.0';   # Minion::Backend::Pg needs Mojo::Pg 5 - older site_perl 4.x won't load
 requires 'Minion',      '>= 12.0';
 requires 'Nanoid',      '>= 0.04';  # opaque session tokens
 # Digest::SHA is core (passcode + token hashing).

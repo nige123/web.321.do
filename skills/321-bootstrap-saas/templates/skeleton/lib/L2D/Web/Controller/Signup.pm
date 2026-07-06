@@ -1,7 +1,8 @@
+# Copyright Nige Ltd. Author: Nigel Hamilton.
 package L2D::Web::Controller::Signup;
 
 #------------------------------------------------------------------------------
-# /signup — collect email + handle, create the user + personal account + owner
+# /signup - collect email + handle, create the user + personal account + owner
 # membership, then hand off to the passcode flow to verify the email.
 #------------------------------------------------------------------------------
 
@@ -37,8 +38,8 @@ sub create ($c) {
         my $msg = $r->{error} eq 'one_personal_per_user'
                     ? 'You already have an account; sign in instead.'
                 : $r->{error} eq 'handle_taken'
-                    ? 'That handle is already taken — try another.'
-                    : 'That handle isn\'t available — try another.';
+                    ? 'That handle is already taken - try another.'
+                    : 'That handle isn\'t available - try another.';
         return $c->render(template => 'auth/signup',
             error => $msg, email => $email, handle => $handle);
     }

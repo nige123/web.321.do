@@ -1,4 +1,4 @@
-# 321.yml — service manifest. `321 go` reads this to deploy dev/live.
+# 321.yml - service manifest. `321 go` reads this to deploy dev/live.
 # Rename `l2d` throughout to your service slug. See the 321-command skill.
 name: l2d.web
 entry: bin/l2d
@@ -6,7 +6,7 @@ runner: hypnotoad
 perl: perl-5.42.0
 health: /health
 branch: main
-# Pin project-local deps for the test gate, same as the runtime — ambient
+# Pin project-local deps for the test gate, same as the runtime - ambient
 # perlbrew site_perl can drift (e.g. a stale Mojo::Pg) and must not decide
 # whether a deploy ships.
 test: PERL5LIB=local/lib/perl5 prove -lr t

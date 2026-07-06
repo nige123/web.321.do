@@ -1,4 +1,4 @@
--- Every account the user belongs to (personal + teams), newest first — the
+-- Every account the user belongs to (personal + teams), newest first - the
 -- data behind a header account-switcher or a post-login dashboard.
 SELECT a.account_id, a.handle, a.kind, a.display_name, m.role
 FROM account_members m

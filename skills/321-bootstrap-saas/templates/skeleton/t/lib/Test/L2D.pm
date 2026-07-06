@@ -1,3 +1,4 @@
+# Copyright Nige Ltd. Author: Nigel Hamilton.
 package Test::L2D;
 
 #------------------------------------------------------------------------------
@@ -45,7 +46,7 @@ sub reset_db ($app) {
     );
 
     # Drain jobs left by other test files. `minion` is a helper, not a method,
-    # so $app->can('minion') is always false — detect it via the renderer's
+    # so $app->can('minion') is always false - detect it via the renderer's
     # helper registry instead, or stale jobs leak across runs.
     $app->minion->reset({ all => 1 }) if $app->renderer->get_helper('minion');
 
