@@ -1,0 +1,33 @@
+SELECT 'active_users' AS metric, day, count(DISTINCT user_id) AS n
+  FROM (
+        SELECT to_char((created_at AT TIME ZONE 'Europe/London'), 'YYYY-MM-DD') AS day,
+               user_id
+          FROM tile_clicks
+         WHERE user_id IS NOT NULL
+           AND created_at >= (([report_date]::date - 7) AT TIME ZONE 'Europe/London')
+           AND created_at <  (([report_date]::date + 1) AT TIME ZONE 'Europe/London')
+        UNION ALL
+        SELECT to_char((created_at AT TIME ZONE 'Europe/London'), 'YYYY-MM-DD'),
+               user_id
+          FROM tile_form_submissions
+         WHERE user_id IS NOT NULL
+           AND created_at >= (([report_date]::date - 7) AT TIME ZONE 'Europe/London')
+           AND created_at <  (([report_date]::date + 1) AT TIME ZONE 'Europe/London')
+       ) acts
+ GROUP BY day
+UNION ALL
+SELECT 'clicks',
+       to_char((created_at AT TIME ZONE 'Europe/London'), 'YYYY-MM-DD'),
+       count(*)
+  FROM tile_clicks
+ WHERE created_at >= (([report_date]::date - 7) AT TIME ZONE 'Europe/London')
+   AND created_at <  (([report_date]::date + 1) AT TIME ZONE 'Europe/London')
+ GROUP BY 2
+UNION ALL
+SELECT 'submissions',
+       to_char((created_at AT TIME ZONE 'Europe/London'), 'YYYY-MM-DD'),
+       count(*)
+  FROM tile_form_submissions
+ WHERE created_at >= (([report_date]::date - 7) AT TIME ZONE 'Europe/London')
+   AND created_at <  (([report_date]::date + 1) AT TIME ZONE 'Europe/London')
+ GROUP BY 2

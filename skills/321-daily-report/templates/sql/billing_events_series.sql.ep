@@ -1,0 +1,17 @@
+SELECT 'trials_started' AS metric,
+       to_char((received_at AT TIME ZONE 'Europe/London'), 'YYYY-MM-DD') AS day,
+       count(*) AS n
+  FROM stripe_events
+ WHERE type = 'customer.subscription.created'
+   AND received_at >= (([report_date]::date - 7) AT TIME ZONE 'Europe/London')
+   AND received_at <  (([report_date]::date + 1) AT TIME ZONE 'Europe/London')
+ GROUP BY 2
+UNION ALL
+SELECT 'payments_received',
+       to_char((received_at AT TIME ZONE 'Europe/London'), 'YYYY-MM-DD'),
+       count(*)
+  FROM stripe_events
+ WHERE type = 'invoice.paid'
+   AND received_at >= (([report_date]::date - 7) AT TIME ZONE 'Europe/London')
+   AND received_at <  (([report_date]::date + 1) AT TIME ZONE 'Europe/London')
+ GROUP BY 2

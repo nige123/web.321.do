@@ -1,0 +1,3 @@
+SELECT billing_status, count(*) AS n
+  FROM accounts
+ GROUP BY billing_status

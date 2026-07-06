@@ -1,0 +1,49 @@
+SELECT 'signups' AS metric,
+       to_char((created_at AT TIME ZONE 'Europe/London'), 'YYYY-MM-DD') AS day,
+       count(*) AS n
+  FROM users
+ WHERE created_at >= (([report_date]::date - 7) AT TIME ZONE 'Europe/London')
+   AND created_at <  (([report_date]::date + 1) AT TIME ZONE 'Europe/London')
+ GROUP BY 2
+UNION ALL
+SELECT 'teams',
+       to_char((created_at AT TIME ZONE 'Europe/London'), 'YYYY-MM-DD'),
+       count(*)
+  FROM accounts
+ WHERE kind = 'team'
+   AND created_at >= (([report_date]::date - 7) AT TIME ZONE 'Europe/London')
+   AND created_at <  (([report_date]::date + 1) AT TIME ZONE 'Europe/London')
+ GROUP BY 2
+UNION ALL
+SELECT 'favsixes',
+       to_char((created_at AT TIME ZONE 'Europe/London'), 'YYYY-MM-DD'),
+       count(*)
+  FROM favarrays
+ WHERE created_at >= (([report_date]::date - 7) AT TIME ZONE 'Europe/London')
+   AND created_at <  (([report_date]::date + 1) AT TIME ZONE 'Europe/London')
+ GROUP BY 2
+UNION ALL
+SELECT 'tiles',
+       to_char((created_at AT TIME ZONE 'Europe/London'), 'YYYY-MM-DD'),
+       count(*)
+  FROM action_tiles
+ WHERE created_at >= (([report_date]::date - 7) AT TIME ZONE 'Europe/London')
+   AND created_at <  (([report_date]::date + 1) AT TIME ZONE 'Europe/London')
+ GROUP BY 2
+UNION ALL
+SELECT 'invites_sent',
+       to_char((created_at AT TIME ZONE 'Europe/London'), 'YYYY-MM-DD'),
+       count(*)
+  FROM team_invites
+ WHERE created_at >= (([report_date]::date - 7) AT TIME ZONE 'Europe/London')
+   AND created_at <  (([report_date]::date + 1) AT TIME ZONE 'Europe/London')
+ GROUP BY 2
+UNION ALL
+SELECT 'invites_accepted',
+       to_char((accepted_at AT TIME ZONE 'Europe/London'), 'YYYY-MM-DD'),
+       count(*)
+  FROM team_invites
+ WHERE accepted_at IS NOT NULL
+   AND accepted_at >= (([report_date]::date - 7) AT TIME ZONE 'Europe/London')
+   AND accepted_at <  (([report_date]::date + 1) AT TIME ZONE 'Europe/London')
+ GROUP BY 2

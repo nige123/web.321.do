@@ -1,0 +1,15 @@
+SELECT f.title, a.handle, count(*) AS n
+  FROM (
+        SELECT array_id FROM tile_clicks
+         WHERE created_at >= ([report_date]::date AT TIME ZONE 'Europe/London')
+           AND created_at <  (([report_date]::date + 1) AT TIME ZONE 'Europe/London')
+        UNION ALL
+        SELECT array_id FROM tile_form_submissions
+         WHERE created_at >= ([report_date]::date AT TIME ZONE 'Europe/London')
+           AND created_at <  (([report_date]::date + 1) AT TIME ZONE 'Europe/London')
+       ) acts
+  JOIN favarrays f ON f.array_id = acts.array_id
+  JOIN accounts  a ON a.account_id = f.account_id
+ GROUP BY f.array_id, f.title, a.handle
+ ORDER BY n DESC, f.title
+ LIMIT 5

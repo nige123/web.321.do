@@ -1,0 +1,3 @@
+SELECT to_char(d, 'YYYY-MM-DD') AS day
+  FROM generate_series([report_date]::date - 7, [report_date]::date, interval '1 day') d
+ ORDER BY d
