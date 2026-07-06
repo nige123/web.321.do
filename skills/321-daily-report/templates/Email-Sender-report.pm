@@ -1,3 +1,4 @@
+# Copyright Nige Ltd. Author: Nigel Hamilton.
 package F6::Email::Sender;
 
 #------------------------------------------------------------------------------

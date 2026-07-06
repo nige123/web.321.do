@@ -1,3 +1,4 @@
+# Copyright Nige Ltd. Author: Nigel Hamilton.
 use strict;
 use warnings;
 use feature 'signatures';
