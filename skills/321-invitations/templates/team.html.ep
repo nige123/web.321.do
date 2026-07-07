@@ -1,0 +1,155 @@
+%# Copyright Nige Ltd. Author: Nigel Hamilton.
+% layout 'staff', title => 'Team';
+% stash breadcrumbs => [ { label => 'Dashboard', url => url_for('staff_home', org_key => current_org->{org_key}) }, { label => 'Team' } ];
+% my %role_label = (
+%   'paydance.staff.checker' => 'Checker',
+%   'paydance.staff.payer'   => 'Payer',
+%   'paydance.staff.admin'   => 'Admin',
+%   'paydance.bookkeeper'    => 'Bookkeeper',
+% );
+<div class="pd-page-header">
+  <h1 class="pd-page-header__title">Team</h1>
+  <p class="pd-page-header__meta">Invite a teammate to <strong><%= current_org->{display_name} %></strong>.</p>
+</div>
+
+<section class="pd-page-section">
+  <header class="pd-page-section__header">
+    <h2 class="pd-page-section__title">Members</h2>
+  </header>
+  % my $members = stash('members') // [];
+  % if (!@$members) {
+    <div class="pd-empty">No members yet.</div>
+  % } else {
+    <ul class="pd-list">
+      % for my $m (@$members) {
+        <li class="pd-list__item">
+          <a class="pd-list__primary" href="<%= url_for 'staff_member', org_key => current_org->{org_key}, user_id => $m->{user_id} %>"><%= $m->{display_name} // $m->{email} %></a>
+          <span class="pd-list__meta">
+            % for my $role (@{ $m->{roles} }) {
+              <span class="pd-role-pill"><%= $role %></span>
+            % }
+          </span>
+        </li>
+      % }
+    </ul>
+  % }
+</section>
+
+<section class="pd-page-section">
+  <header class="pd-page-section__header">
+    <h2 class="pd-page-section__title">Pending invitations</h2>
+  </header>
+  % if (!@$pending) {
+    <div class="pd-empty">No pending invitations.</div>
+  % } else {
+    <ul class="pd-list">
+      % for my $inv (@$pending) {
+        <li class="pd-list__item">
+          <span class="pd-list__primary"><%= $inv->{email} %></span>
+          <span class="pd-list__meta">
+            <%= $role_label{ $inv->{role} } // $inv->{role} %>
+            · invited <%= human_time($inv->{created_at}) %><% if ($inv->{is_expired}) { %> · expired<% } %>
+          </span>
+          <span class="pd-list__actions">
+            <form method="post" action="<%= url_for 'org_team_reinvite', invitation_id => $inv->{invitation_id} %>">
+              <button class="pd-button pd-button--secondary" type="submit">Send again</button>
+            </form>
+          </span>
+        </li>
+      % }
+    </ul>
+  % }
+</section>
+
+<section class="pd-page-section">
+  <header class="pd-page-section__header">
+    <h2 class="pd-page-section__title">Pending access requests</h2>
+  </header>
+  % my $requests = stash('requests') // [];
+  % if (!@$requests) {
+    <div class="pd-empty">No requests waiting.</div>
+  % } else {
+    <ul class="pd-list">
+      % for my $req (@$requests) {
+        <li class="pd-list__item">
+          <span class="pd-list__primary"><%= $req->{email} %></span>
+          <span class="pd-list__meta">
+            requested <%= human_time($req->{created_at}) %>
+          </span>
+          <span class="pd-list__actions">
+            <form method="post" action="<%= url_for 'org_team_request_approve', request_id => $req->{request_id} %>">
+              <button class="pd-button pd-button--primary" type="submit">Approve</button>
+            </form>
+            <form method="post" action="<%= url_for 'org_team_request_deny', request_id => $req->{request_id} %>">
+              <button class="pd-button pd-button--secondary" type="submit">Deny</button>
+            </form>
+          </span>
+        </li>
+      % }
+    </ul>
+  % }
+</section>
+
+<section class="pd-page-section">
+  <header class="pd-page-section__header">
+    <h2 class="pd-page-section__title">External contributors</h2>
+  </header>
+  % my $contributors = stash('contributors') // [];
+  % my @pending_bk = grep { ($_->{role} // '') eq 'paydance.bookkeeper' } @$pending;
+  % if (!@$contributors && !@pending_bk) {
+    <div class="pd-empty">No external contributors yet.</div>
+  % } else {
+    <ul class="pd-list">
+      % for my $person (@$contributors) {
+        <li class="pd-list__item">
+          <span class="pd-list__primary"><%= $person->{email} %></span>
+          <span class="pd-list__meta">
+            <span class="pd-role-pill"><%= $person->{label} // 'Bookkeeper' %></span>
+          </span>
+          <span class="pd-list__actions">
+            <form method="post" action="<%= url_for 'org_team_revoke' %>">
+              <input type="hidden" name="user_id" value="<%= $person->{user_id} %>">
+              <input type="hidden" name="role" value="<%= $person->{role} %>">
+              <button class="pd-button pd-button--secondary" type="submit">Remove</button>
+            </form>
+          </span>
+        </li>
+      % }
+      % for my $inv (@pending_bk) {
+        <li class="pd-list__item">
+          <span class="pd-list__primary"><%= $inv->{email} %></span>
+          <span class="pd-list__meta">
+            <span class="pd-role-pill">Bookkeeper</span>
+            · invited <%= human_time($inv->{created_at}) %> · not yet accepted
+          </span>
+        </li>
+      % }
+    </ul>
+  % }
+</section>
+
+<section class="pd-page-section">
+  <header class="pd-page-section__header">
+    <h2 class="pd-page-section__title">Invite a teammate</h2>
+  </header>
+  <form class="pd-form" method="post" action="<%= url_for 'org_team' %>">
+    <div class="pd-field">
+      <label class="pd-label" for="email">Email address</label>
+      <input class="pd-input" id="email" name="email" type="email"
+             autocomplete="off" required>
+    </div>
+    <div class="pd-field">
+      <label class="pd-label" for="role">Role</label>
+      <select class="pd-input" id="role" name="role">
+        <option value="paydance.staff.checker">Checker</option>
+        <option value="paydance.staff.payer">Payer</option>
+        <option value="paydance.staff.admin">Admin (full access)</option>
+        <option value="paydance.bookkeeper">Bookkeeper (external)</option>
+      </select>
+      <small class="pd-help">Checkers triage and prepare; payers approve and pay; an admin does both. A bookkeeper is an external contributor without staff-console access.</small>
+    </div>
+    <div class="pd-form__actions">
+      <button class="pd-button pd-button--primary" type="submit">Send invitation</button>
+    </div>
+  </form>
+</section>

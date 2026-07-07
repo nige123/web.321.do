@@ -1,0 +1,22 @@
+%# Copyright Nige Ltd. Author: Nigel Hamilton.
+% layout 'public', title => 'Join ' . $org->{display_name};
+<div class="pd-page-header">
+  <h1 class="pd-page-header__title">Join <%= $org->{display_name} %></h1>
+  <p class="pd-page-header__meta">You have been invited to join <strong><%= $org->{display_name} %></strong> on Paydance.</p>
+</div>
+
+% if ($signed_in) {
+  <p>Accepting adds you to the team — you will be taken to the console.</p>
+  <form class="pd-form" method="post" action="<%= url_for 'accept_invitation' %>">
+    <div class="pd-form__actions">
+      <button class="pd-button pd-button--primary" type="submit">Accept and join</button>
+    </div>
+  </form>
+% } else {
+  <p>Accepting signs you in and adds you to the team - no password needed.</p>
+  <form class="pd-form" method="post" action="<%= url_for 'accept_invitation' %>">
+    <div class="pd-form__actions">
+      <button class="pd-button pd-button--primary" type="submit">Accept and join</button>
+    </div>
+  </form>
+% }
