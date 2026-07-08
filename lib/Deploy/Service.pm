@@ -94,11 +94,15 @@ sub deploy ($self, $name, %opts) {
     return $self->_deploy_result($name, 'error', 'System packages missing', \@steps)
         unless $apt_ok;
 
+    # Remember where we started so a failed health gate can roll back.
+    my ($old_sha, $new_sha);
     unless ($skip_git) {
+        $old_sha = $self->_head_sha($svc);
         $s = $self->_step_git_pull($svc);
         push @steps, $s;
         return $self->_deploy_result($name, 'error', 'Git pull failed', \@steps)
             unless $self->_ok($s);
+        $new_sha = $self->_head_sha($svc);
     }
 
     $s = $self->_step_cpanm($svc);
@@ -110,6 +114,26 @@ sub deploy ($self, $name, %opts) {
         push @steps, $s;
         return $self->_deploy_result($name, 'error', 'Migration failed', \@steps)
             unless $self->_ok($s);
+    }
+
+    # Hypnotoad services whose INSTALLED ubic file is already the
+    # self-supervising Common form hot-swap via USR2 - zero downtime, ubic
+    # never notices the manager pid change. A service still under
+    # SimpleDaemon guardianship must instead be stopped through the OLD file
+    # BEFORE the new one is uploaded: with the file already replaced, a
+    # Common-style stop would kill the manager but orphan the guardian, which
+    # would immediately respawn it. So the decision (and the transition stop)
+    # happen before generate_ubic.
+    my $is_hypno = !$svc->{is_worker} && ($svc->{runner} // 'hypnotoad') eq 'hypnotoad';
+    my $was_hot  = $is_hypno ? $self->_installed_ubic_is_hot($name) : 0;
+    my $old_pid  = $was_hot ? $self->_live_hypnotoad_pid($svc) : undef;
+    my $hot      = $was_hot && $old_pid;
+
+    my @teardown;
+    if ($is_hypno && !$hot) {
+        # Cold path: tear down under the currently-installed semantics.
+        @teardown = $self->_bounce_teardown_steps($name, $svc);
+        push @steps, @teardown;
     }
 
     if ($self->ubic_mgr) {
@@ -127,33 +151,110 @@ sub deploy ($self, $name, %opts) {
         push @steps, { step => 'generate_ubic', success => \1, output => "Generated: $gen->{path}" };
     }
 
-    # Authoritative bounce (stop → drain → clear pidfile → start), not a bare
-    # `ubic restart` - same race fix as the restart command. See _bounce_steps.
-    my @bounce = $self->_bounce_steps($name, $svc);
-    push @steps, @bounce;
-    unless ($self->_ok($bounce[-1])) {
-        my $msg = $svc->{is_worker} ? 'Ubic restart failed' : 'Ubic start failed';
-        return $self->_deploy_result($name, 'error', $msg, \@steps);
+    my ($hot_attempted, $swap_took) = (0, 0);
+    if ($hot) {
+        $hot_attempted = 1;
+        $s = $self->_step_hot_deploy($svc, $old_pid);
+        push @steps, $s;
+        $swap_took = $self->_ok($s);
+        # A swap that never took is a failed deploy, but nothing is down: the
+        # previous release kept serving. The gate/rollback below handles it.
+    }
+    elsif ($is_hypno) {
+        # Teardown already ran above; boot through the freshly-installed file.
+        $s = $self->_step_ubic_start($name);
+        push @steps, $s;
+        unless ($self->_ok($s)) {
+            return $self->_deploy_result($name, 'error', 'Ubic start failed', \@steps);
+        }
+    }
+    else {
+        my @bounce = $self->_bounce_steps($name, $svc);
+        push @steps, @bounce;
+        unless ($self->_ok($bounce[-1])) {
+            my $msg = $svc->{is_worker} ? 'Ubic restart failed' : 'Ubic start failed';
+            return $self->_deploy_result($name, 'error', $msg, \@steps);
+        }
     }
 
-    # Workers have no port to probe - a successful bounce is the deploy
-    # success criterion for them.
-    my $final_ok = 1;
-    unless ($svc->{is_worker}) {
-        $self->_sleep(2);
-        $s = $self->_step_port_check($svc);
-        push @steps, $s;
-        $final_ok = $self->_ok($s);
+    # The gate: a declared manifest health path must answer 2xx; otherwise any
+    # response on the port will do. Workers have neither - a successful bounce
+    # is their success criterion.
+    my ($gate_ok, $gate_reason) = (1, '');
+    if ($hot_attempted && !$swap_took) {
+        ($gate_ok, $gate_reason) = (0, 'the hot swap did not take - the previous release kept serving');
+    }
+    elsif (!$svc->{is_worker}) {
+        my $g = $self->_gate_step($name, $svc);
+        push @steps, $g;
+        $gate_ok = $self->_ok($g);
+        $gate_reason = "$g->{step} failed" unless $gate_ok;
+    }
+
+    my $tag = $skip_git ? ' (dev)' : '';
+
+    if ($gate_ok) {
+        $self->_log_deploy($name, \@steps);
+        return $self->_deploy_result($name, 'success', "Deployed $name$tag successfully", \@steps);
+    }
+
+    # Gate failed. Roll back when there is a previous sha to return to.
+    if (!$skip_git && $old_sha && $new_sha && $old_sha ne $new_sha) {
+        my $recovered = $self->_rollback($name, $svc, \@steps, $old_sha, $hot_attempted, $swap_took);
+        $self->_log_deploy($name, \@steps);
+        my $short = substr($old_sha, 0, 7);
+        return $self->_deploy_result($name,
+            $recovered ? 'rolled_back' : 'error',
+            $recovered
+                ? "Deploy of $name failed ($gate_reason) - rolled back to $short"
+                : "Deploy of $name failed ($gate_reason) and the rollback to $short did not recover - check the service",
+            \@steps);
     }
 
     $self->_log_deploy($name, \@steps);
+    return $self->_deploy_result($name, 'error', "Deployed $name$tag but $gate_reason", \@steps);
+}
 
-    my $tag = $skip_git ? ' (dev)' : '';
-    my $final_status = $final_ok ? 'success' : 'error';
-    my $final_msg = $final_ok
-        ? "Deployed $name$tag successfully"
-        : "Deployed $name$tag but port check failed";
-    return $self->_deploy_result($name, $final_status, $final_msg, \@steps);
+# Restore the repo to $old_sha and put the previous release back in service.
+# Appends its steps to @$steps; returns 1 when the service answers its gate
+# again afterwards.
+sub _rollback ($self, $name, $svc, $steps, $old_sha, $hot_attempted, $swap_took) {
+    my $r = $self->_run_in_dir($svc->{repo}, "git reset --hard $old_sha");
+    push @$steps, { step => 'rollback_git', success => $r->{ok} ? \1 : \0, output => $r->{output} };
+    return 0 unless $r->{ok};
+
+    my $s = $self->_step_cpanm($svc);
+    push @$steps, { %$s, step => 'rollback_cpanm' };
+
+    if ($hot_attempted && $swap_took) {
+        # The bad release is serving - swap once more, now that the repo holds
+        # the old code again.
+        my $cur = $self->_live_hypnotoad_pid($svc);
+        if ($cur) {
+            $s = $self->_step_hot_deploy($svc, $cur, 'rollback_swap');
+            push @$steps, $s;
+            return 0 unless $self->_ok($s);
+        }
+        else {
+            push @$steps, { step => 'rollback_swap', success => \0,
+                output => 'no live manager found to swap back' };
+            return 0;
+        }
+    }
+    elsif ($hot_attempted && !$swap_took) {
+        # The old release never stopped serving; the repo reset is the fix.
+        push @$steps, { step => 'rollback_swap', success => \1,
+            output => 'previous release kept serving - no swap needed' };
+    }
+    else {
+        my @bounce = $self->_bounce_steps($name, $svc);
+        push @$steps, @bounce;
+        return 0 unless $self->_ok($bounce[-1]);
+    }
+
+    my $g = $self->_gate_step($name, $svc);
+    push @$steps, { %$g, step => "rollback_$g->{step}" };
+    return $self->_ok($g);
 }
 
 sub _step_apt_deps ($self, $svc) {
@@ -227,6 +328,86 @@ sub deploy_dev ($self, $name) {
     return $self->deploy($name, skip_git => 1);
 }
 
+# Full sha of the repo's current HEAD on the deploy target, or undef.
+sub _head_sha ($self, $svc) {
+    my $r = $self->_run_in_dir($svc->{repo}, 'git rev-parse HEAD');
+    return undef unless $r->{ok};
+    my ($sha) = ($r->{output} // '') =~ /([0-9a-f]{40})/;
+    return $sha;
+}
+
+# True when the installed ubic service file is the self-supervising Common
+# form. A service still under SimpleDaemon guardianship must never be USR2'd:
+# the guardian sees its child exit mid-swap and restarts over the top.
+sub _installed_ubic_is_hot ($self, $name) {
+    my ($group, $svc_name) = split /\./, $name, 2;
+    my $r = $self->_run_cmd("cat ~/ubic/service/$group/$svc_name 2>/dev/null");
+    return ($r->{output} // '') =~ /Ubic::Service::Common/ ? 1 : 0;
+}
+
+# Pid from hypnotoad's own pidfile, iff that process is alive. Runs on the
+# deploy target (local or SSH), so no direct kill(0) here.
+sub _live_hypnotoad_pid ($self, $svc) {
+    my $pidfile = $svc->{pid_file} or return undef;
+    my $r = $self->_run_cmd(
+        qq{p=\$(cat '$pidfile' 2>/dev/null); [ -n "\$p" ] && kill -0 "\$p" 2>/dev/null && echo "\$p"});
+    return undef unless $r->{ok};
+    my ($pid) = ($r->{output} // '') =~ /^\s*(\d+)\s*$/;
+    return $pid;
+}
+
+# Zero-downtime swap: USR2 tells the running manager to exec a fresh copy of
+# itself on the current repo code; the old workers drain while the new ones
+# take over the socket. Success = the pidfile now names a different live
+# manager. If it never changes, the new code failed to boot and hypnotoad
+# kept the previous release serving - report failure, nothing is down.
+sub _step_hot_deploy ($self, $svc, $old_pid, $label = 'hot_deploy') {
+    my $r = $self->_run_cmd("kill -USR2 $old_pid");
+    return { step => $label, success => \0, output => "USR2 to $old_pid failed: $r->{output}" }
+        unless $r->{ok};
+
+    for my $poll (1 .. 30) {
+        $self->_sleep(1);
+        my $pid = $self->_live_hypnotoad_pid($svc);
+        if ($pid && $pid ne $old_pid) {
+            return { step => $label, success => \1,
+                output => "manager $old_pid -> $pid (zero downtime)" };
+        }
+    }
+    return { step => $label, success => \0,
+        output => 'manager pid unchanged after USR2 - the upgrade did not take; '
+                . 'the previous release kept serving' };
+}
+
+# Post-deploy gate. A health path declared in the manifest is authoritative:
+# it must answer 2xx. Undeclared health falls back to the port check (any
+# response), because probing a default /health an app never implemented
+# would fail every deploy.
+sub _gate_step ($self, $name, $svc) {
+    my $declared = $self->_declared_health($name);
+    return $self->_step_health_check($svc, $declared) if defined $declared;
+    $self->_sleep(2);
+    return $self->_step_port_check($svc);
+}
+
+sub _declared_health ($self, $name) {
+    my $raw = $self->config->service_raw($name) or return undef;
+    return $raw->{health};
+}
+
+sub _step_health_check ($self, $svc, $path, $attempts = 10) {
+    my $port = $svc->{port};
+    my $url  = "http://127.0.0.1:$port$path";
+    for my $i (1 .. $attempts) {
+        my $r = $self->_run_cmd("curl -sf -o /dev/null --connect-timeout 1 $url");
+        return { step => 'health_check', success => \1,
+            output => "GET $path on :$port healthy" } if $r->{ok};
+        $self->_sleep(1) unless $i == $attempts;
+    }
+    return { step => 'health_check', success => \0,
+        output => "GET $path on :$port failed after $attempts attempts" };
+}
+
 sub restart ($self, $name) {
     my $svc = $self->config->service($name);
     return { status => 'error', message => "Unknown service: $name" } unless $svc;
@@ -265,7 +446,15 @@ sub restart ($self, $name) {
 # Workers (no port, no pidfile) get a plain in-place `ubic restart`.
 sub _bounce_steps ($self, $name, $svc) {
     return ($self->_step_ubic_restart($name)) if $svc->{is_worker};
+    my @steps = $self->_bounce_teardown_steps($name, $svc);
+    push @steps, $self->_step_ubic_start($name);
+    return @steps;
+}
 
+# The stop half of the bounce: stop -> wait for the port to free -> clear
+# hypnotoad's pidfile. Split out so a deploy that replaces the ubic service
+# file can tear down under the OLD file's semantics and start under the new.
+sub _bounce_teardown_steps ($self, $name, $svc) {
     my @steps = $self->_step_ubic_stop($name);  # a failed stop usually just means "already down"
 
     if (my $port = $svc->{port}) {
@@ -281,7 +470,6 @@ sub _bounce_steps ($self, $name, $svc) {
     $self->_clear_hypnotoad_pid($svc)
         if ($svc->{runner} // 'hypnotoad') eq 'hypnotoad';
 
-    push @steps, $self->_step_ubic_start($name);
     return @steps;
 }
 

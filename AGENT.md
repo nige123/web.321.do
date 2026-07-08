@@ -27,7 +27,7 @@ Run from `/home/s3/web.321.do`. Paths in this document are absolute.
 ```
 321 status [name] [target]      # ubic status; per-service detail or fleet-wide
 321 list                        # all known services with mode/runner/port
-321 go <name> [target]          # deploy: install if first time, otherwise hot-restart
+321 go <name> [target]          # deploy: install if first time; running hypnotoad services hot-swap (USR2, zero downtime) with health-gated rollback
 321 install <name> [target]     # explicit first-time bring-up (clone, deps, ubic, nginx, SSL, start)
 321 restart <name> [target]     # ubic restart; auto-regenerates ubic file if 321.yml is newer
 321 start | stop <name> [target]

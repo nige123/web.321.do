@@ -8,7 +8,7 @@ my %VALID_RUNNER = map { $_ => 1 } qw(hypnotoad morbo script);
 
 my %IDENTITY_KEY = map { $_ => 1 } qw(
     name entry runner perl health branch repo test
-    apt_deps favicon workers force_https
+    apt_deps favicon workers force_https pid_file
 );
 
 sub load ($class, $repo_dir) {
@@ -37,12 +37,16 @@ sub load ($class, $repo_dir) {
         entry        => $raw->{entry},
         runner       => $raw->{runner},
         perl         => $raw->{perl},
-        health       => $raw->{health} // '/health',
+        # health passes through undefaulted: Deploy::Config supplies the
+        # '/health' fallback, and the deploy health gate needs to know whether
+        # the manifest actually declared a probe path.
+        health       => $raw->{health},
         branch       => $raw->{branch} // 'master',
         apt_deps     => $raw->{apt_deps} // [],
         targets      => \%targets,
         repo         => "$repo_dir",
-        ($raw->{repo}    ? (git_url => $raw->{repo})    : ()),
+        ($raw->{repo}     ? (git_url  => $raw->{repo})     : ()),
+        ($raw->{pid_file} ? (pid_file => $raw->{pid_file}) : ()),
         ($raw->{test}    ? (test    => $raw->{test})    : ()),
         ($raw->{favicon} ? (favicon => $raw->{favicon}) : ()),
         ($raw->{workers} ? (workers => $raw->{workers}) : ()),

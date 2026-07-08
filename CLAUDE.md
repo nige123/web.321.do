@@ -22,9 +22,9 @@ Single lightweight daemon on port **9321**. Entry point is `bin/321.pl` (Mojolic
 
 Core modules (`lib/Deploy/`):
 
-- `Config.pm` — loads per-repo `321.yml` manifests, resolves the active target (`dev`/`live`) into a flat service descriptor.
-- `Service.pm` — `status`, `deploy` (git + cpanm + ubic restart + port check), `deploy_dev` (no git pull), log writes under `/tmp/321.do/deploys/`.
-- `Ubic.pm` — generates `ubic/service/<group>/<name>` files from config and installs symlinks under `~/ubic/service/<group>/<name>`. Builds the `perlbrew exec --with … env KEY=VAL hypnotoad -f …` (or `morbo`) command line.
+- `Config.pm` — loads per-repo `321.yml` manifests, resolves the active target (`dev`/`live`) into a flat service descriptor (including `pid_file`, defaulting beside the entry script).
+- `Service.pm` — `status`, `deploy` (git + cpanm + zero-downtime hypnotoad hot swap via USR2, or stop/start bounce + health-gated rollback to the previous sha), `deploy_dev` (no git pull, no rollback), log writes under `/tmp/321.do/deploys/`.
+- `Ubic.pm` — generates `ubic/service/<group>/<name>` files from config and installs symlinks under `~/ubic/service/<group>/<name>`. Hypnotoad services get a self-supervising `Ubic::Service::Common` file (start = `setsid … hypnotoad -f` with the manifest logs attached; stop/status via hypnotoad's own pidfile) so a USR2 hot swap never looks like a death to ubic. Morbo and worker services keep `Ubic::Service::SimpleDaemon` with the `perlbrew exec --with … env KEY=VAL …` command line.
 - `Nginx.pm` — renders `/etc/nginx/sites-available/<host>` (HTTP + optional SSL), enables the site, runs `nginx -t` + `systemctl reload nginx`. Delegates cert paths and acquisition commands to `CertProvider`.
 - `CertProvider.pm` — chooses certbot (live) or mkcert (dev) based on active target; returns cert/key paths and the acquire command. See `## Dev parity`.
 - `Hosts.pm` — rewrites the `# BEGIN 321.do managed` block in `/etc/hosts` with dev-target hostnames pulled from `Config->dev_hostnames`. See `## Dev parity`.
@@ -56,7 +56,7 @@ GET  /health                          — health check (public, no auth)
 
 GET  /services                        — list all services + status
 GET  /service/:name/status            — detailed status (pid, port, git sha, mode, runner)
-POST /service/:name/deploy            — git pull + cpanm + regenerate ubic + ubic restart + port check
+POST /service/:name/deploy            — git pull + cpanm + regenerate ubic + hot swap (USR2) or bounce + health gate; rolls back to the previous sha on a failed gate (status: rolled_back)
 POST /service/:name/deploy-dev        — cpanm + regenerate ubic + ubic restart (no git pull)
 POST /service/:name/start             — ubic start
 POST /service/:name/stop              — ubic stop
@@ -166,6 +166,30 @@ live:
 **Secrets are the service repo's responsibility, not 321's.** Each app loads its own secrets however it wants (its own config file, an environment loader at startup, etc.). 321 only passes through whatever non-sensitive env vars the target block declares under `env:`.
 
 If a target's hypnotoad runner needs to listen on a specific port, the app's production config must set `hypnotoad => { listen => ['http://*:PORT'] }` to match the manifest port — 321 can't pass it on the command line. A mismatch shows up as a `port_check` failure with the actual bound port in the hint.
+
+### Hot deploys, the health gate, and pid_file
+
+Deploys of a running hypnotoad service are zero-downtime: 321 sends the
+manager USR2 (hypnotoad's native hot swap — new workers boot the new code
+while the old ones drain) and waits for the pidfile to name a new live
+manager. The swap is driven through hypnotoad's own pidfile, which 321
+resolves as `<repo>/<entry dir>/hypnotoad.pid` unless the manifest sets
+`pid_file:` — **an app that overrides `pid_file` in its hypnotoad config must
+mirror the same path in `321.yml`**, or 321 can't find the manager and falls
+back to a cold stop/start bounce (safe, but with the old brief downtime).
+
+Every deploy is gated: a `health:` path declared in the manifest must answer
+2xx (undeclared health falls back to "anything answers on the port"). On
+live, a failed gate rolls the repo back to the pre-deploy sha, puts the old
+release back in service (a second hot swap), and reports `rolled_back`. If
+the new code fails to even boot, hypnotoad keeps the old release serving and
+321 just resets the repo — nothing goes down. Dev deploys report the failure
+but never roll back.
+
+The first deploy after 321 itself is upgraded to this scheme does one final
+cold bounce per service (the old SimpleDaemon supervision has to be torn down
+under the old ubic file before the self-supervising one takes over); every
+deploy after that is hot.
 
 ### Entry script `@INC` — never glob the local-lib tree
 

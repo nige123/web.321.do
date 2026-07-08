@@ -81,7 +81,7 @@ Most `321` commands accept a prefix/substring (`321 status zorda` → `zorda.web
 
 Default target is `dev`. From inside a service repo with a `321.yml`, `321 go` infers the service name from the manifest.
 
-`321 go` is the workhorse: deploys (apt → git pull → cpanm → ubic start/restart → port probe), hot-restarts via Hypnotoad's SIGUSR2, and on live re-probes the public HTTPS cert + auto-runs nginx setup + cert acquisition if missing.
+`321 go` is the workhorse: deploys (apt → git pull → cpanm → zero-downtime USR2 hot swap for running hypnotoad services, stop/start bounce otherwise → health gate), and on live re-probes the public HTTPS cert + auto-runs nginx setup + cert acquisition if missing. A live deploy whose health gate fails rolls the repo back to the previous sha and re-serves the old release (status: `rolled_back`) - nothing stays broken. Apps that override `pid_file` in their hypnotoad config must mirror it in `321.yml`, or deploys fall back to the cold bounce.
 
 ## Hard rules — don't bypass
 

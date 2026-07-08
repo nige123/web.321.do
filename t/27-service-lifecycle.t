@@ -66,8 +66,9 @@ subtest 'deploy returns the same step sequence as before the refactor' => sub {
     my $r = $svc_mgr->deploy('demo.web', skip_git => 1);
     my @steps = map { $_->{step} } @{ $r->{data}{steps} };
     is_deeply \@steps,
-        [qw(apt_deps cpanm generate_ubic ubic_stop port_drain ubic_start port_check)],
-        'full deploy emits the expected step list (skip_git)';
+        [qw(apt_deps cpanm ubic_stop port_drain generate_ubic ubic_start port_check)],
+        'full deploy emits the expected step list (skip_git): teardown under the'
+      . ' old ubic file, start under the freshly generated one';
 };
 
 subtest '_step_migrate: success' => sub {
@@ -121,7 +122,7 @@ subtest 'deploy runs bin/migrate when present' => sub {
     my $r = $svc_mgr->deploy('demo.web', skip_git => 1);
     my @steps = map { $_->{step} } @{ $r->{data}{steps} };
     is_deeply \@steps,
-        [qw(apt_deps cpanm migrate generate_ubic ubic_stop port_drain ubic_start port_check)],
+        [qw(apt_deps cpanm migrate ubic_stop port_drain generate_ubic ubic_start port_check)],
         'migrate slotted between cpanm and the ubic bounce';
 };
 

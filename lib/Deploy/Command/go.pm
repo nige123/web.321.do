@@ -74,7 +74,12 @@ sub run ($self, @args) {
     my $skip_git = ($target eq 'dev') ? 1 : 0;
     my $r = $svc_mgr->deploy($name, skip_git => $skip_git);
     $self->print_steps($r);
-    say "  $r->{message}" if $r->{message};
+    if (my $msg = $r->{message}) {
+        my $status = $r->{status} // '';
+        say $status eq 'rolled_back' ? "  \e[33m$msg\e[0m"
+          : $status eq 'error'       ? "  \e[31m$msg\e[0m"
+          :                            "  $msg";
+    }
 
     $self->_ensure_serving($name, $target, $transport);
 
@@ -194,7 +199,11 @@ sub _ensure_dev_host ($self, $host) {
   Usage: APPLICATION go [service] [target]
 
   First run on a target installs (clone, deps, ubic, nginx, SSL, start).
-  Later runs hot-restart via hypnotoad (git pull, cpanm, ubic restart).
+  Later runs deploy: git pull + cpanm, then a zero-downtime hypnotoad hot
+  swap (USR2) for running hypnotoad services, or a stop/start bounce for
+  everything else. The deploy is gated on the manifest health path (or the
+  port); a failed gate on live rolls the repo back to the previous sha and
+  puts the old release back in service (status: rolled_back).
 
   321 go              # deploy current repo to dev
   321 go live         # deploy current repo to live

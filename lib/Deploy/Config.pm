@@ -91,6 +91,17 @@ sub _resolve ($self, $name, $manifest) {
     # into dev workers and they'd try to reach the live DB.
     my $mode = ($target_name eq 'dev') ? 'development' : 'production';
 
+    # Where hypnotoad keeps its manager pid. Defaults beside the entry script
+    # (hypnotoad's own default); a manifest pid_file (target wins) must mirror
+    # any pid_file the app sets in its hypnotoad config, since 321 cannot pass
+    # it on the command line.
+    my $pid_file = $is_worker ? undef
+        : $target->{pid_file} // $manifest->{pid_file} // do {
+              my ($bindir) = ($manifest->{entry} // '') =~ m{^(.*)/};
+              my $sub = (defined $bindir && length $bindir) ? "/$bindir" : '';
+              "$manifest->{repo}$sub/hypnotoad.pid";
+          };
+
     return {
         name         => $name,
         repo         => $manifest->{repo},
@@ -108,6 +119,7 @@ sub _resolve ($self, $name, $manifest) {
             ubic   => "/tmp/$name.ubic.log",
         },
         ($is_worker            ? (is_worker => 1)                    : ()),
+        ($pid_file             ? (pid_file => $pid_file)             : ()),
         ($manifest->{test}     ? (test     => $manifest->{test})     : ()),
         ($manifest->{favicon}  ? (favicon  => $manifest->{favicon})  : ()),
         (exists $manifest->{force_https} ? (force_https => $manifest->{force_https}) : ()),
