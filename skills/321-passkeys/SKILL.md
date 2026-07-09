@@ -75,7 +75,11 @@ Work test-first. Each step has a template; `<NS>` = the app's namespace.
    `GET /passkeys/add` and `POST /passkeys/:credential_id/remove`. Login verify
    reuses `start_session_for`. Add the routes.
 7. **Client JS** (`templates/passkeys.js`): base64url + `navigator.credentials
-   .create/get` + fetch. Append to your JS bundle; bump its cache-buster.
+   .create/get` + fetch. Append to your JS bundle, or include it standalone
+   via the base's cache-busting helper: `<script src="<%= asset_url
+   q{/js/passkeys.js} %>" defer></script>` - never a bare `/js/passkeys.js`
+   (321 hot deploys are zero-downtime, so a stale cached copy never gets a
+   refresh nudge otherwise).
 8. **Sign-in UI** (`templates/ui/signin_button.html.ep`): a "Sign in with a
    passkey" button, hidden until JS confirms support.
 9. **Registration UI** (`templates/ui/passkey_offer.html.ep`,

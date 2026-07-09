@@ -95,6 +95,21 @@ sub _setup_minion ($self) {
 #------------------------------------------------------------------------------
 sub _setup_helpers ($self) {
 
+    # asset_url: append a deploy-stable version stamp to local CSS/JS links
+    # so a release actually reaches browsers (cache busting). 321 hot deploys
+    # swap the app with zero downtime, so nothing ever nudges a user to
+    # refresh - without the stamp, browsers pair the new HTML with the old
+    # cached stylesheet and the page renders half-unstyled. The git sha
+    # changes with every deploy; a checkout-less environment falls back to
+    # the server start time, which changes on every restart.
+    my $asset_v = do {
+        my $home = $self->home;
+        my $sha  = qx{git -C '$home' rev-parse --short HEAD 2>/dev/null} // '';
+        chomp $sha;
+        length $sha ? $sha : $^T;
+    };
+    $self->helper(asset_url => sub ($c, $path) { "$path?v=$asset_v" });
+
     # current_user: resolve the DB session behind the signed 'l2d_session'
     # cookie, memoized per request. Returns { user_id, email, ... } or undef.
     $self->helper(current_user => sub ($c) {

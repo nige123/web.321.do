@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title><%= title || 'l2d' %></title>
     <link rel="icon" href="/favicon.ico">
-    <link rel="stylesheet" href="/css/app.css?v=1">
+    <link rel="stylesheet" href="<%= asset_url q{/css/app.css} %>">
 </head>
 <body>
     <header class="nav">
@@ -31,6 +31,6 @@
     <footer class="foot">
         <p>&copy; l2d</p>
     </footer>
-    <script src="/js/app.js?v=1" defer></script>
+    <script src="<%= asset_url q{/js/app.js} %>" defer></script>
 </body>
 </html>

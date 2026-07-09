@@ -16,6 +16,7 @@ use_ok 'L2D::Web';
 
 my $t = Test::Mojo->new('L2D::Web');
 $t->get_ok('/health')->status_is(200)->content_is('ok');
-$t->get_ok('/')->status_is(200);
+$t->get_ok('/')->status_is(200)
+  ->element_exists('link[rel="stylesheet"][href^="/css/app.css?v="]', 'assets carry the cache-busting stamp');
 
 done_testing;

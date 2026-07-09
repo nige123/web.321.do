@@ -110,7 +110,7 @@ and shapes** stable — that is the contract.
 | Concern | Owned by | Bolt-on hook |
 |---|---|---|
 | users, passcodes, sessions, accounts, account_members | **this skill** (`-- 1 up`) | — |
-| `<NS>::Web` app class, `db`/`current_user`/`start_session_for` helpers | **this skill** | feature skills add helpers alongside |
+| `<NS>::Web` app class, `db`/`current_user`/`start_session_for`/`asset_url` helpers | **this skill** | feature skills add helpers alongside |
 | SQL-template engine (`DB.pm`, `DB/SQL.pm`) | this skill ships it | **321-sql-template** — the authority on it |
 | passkeys (`webauthn_credentials`, WebAuthn routes) | **321-passkeys** | reuses `start_session_for`; `-- N up` |
 | Stripe billing (accounts billing cols, `stripe_events`) | **321-stripe** | reuses `can_administer_team`; `-- N up` |
@@ -134,6 +134,13 @@ and shapes** stable — that is the contract.
   survives the request and retries with backoff.
 - **`321` owns deploy.** `bin/l2d` behind hypnotoad + nginx; never invoke
   ubic/morbo/certbot directly.
+- **Cache-busted assets, always.** Every local CSS/JS link goes through the
+  `asset_url` helper (`href="<%= asset_url q{/css/app.css} %>"`), which stamps
+  `?v=<git sha>` per release. 321 hot deploys are zero-downtime, so nothing
+  ever nudges a browser to refresh - an unstamped link pairs new HTML with
+  the old cached stylesheet and the page renders half-unstyled (seen live on
+  paydance.com). Never hand-write `?v=1`; never link a bare asset path. Tests
+  match with a prefix selector: `[href^="/css/app.css?v="]`.
 - **No en- or em-dashes, anywhere.** House copy rule: never use `–`, `—`,
   `&ndash;` or `&mdash;` in templates, code comments, user-facing copy, README
   or commit messages - write a plain hyphen (" - ") instead. Typographic
