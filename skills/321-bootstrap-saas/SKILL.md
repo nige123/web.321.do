@@ -22,6 +22,15 @@ The worked example is namespaced `L2D::` / `l2d` (the app it was first cut for,
 love2.do) exactly as the sibling skills use `F6::` / favsix. **Rename it to
 yours** (see step 2).
 
+**This skill is one of a family - invoke the others, don't improvise.** It
+only ships the code. Everything about *running* it - `321 go`, `321 status`,
+start/stop/restart, deploys, logs, `321 install`, nginx/certbot - is owned by
+the **321-command** skill: invoke it whenever you touch the `321` CLI, and
+never hand-roll ubic, morbo, hypnotoad, nginx or certbot commands. Likewise,
+before building any common SaaS concern by hand (billing, passkeys, invites,
+share links, SEO plumbing, owner emails, brand colours), check
+**"The 321 skill family"** below - it probably has a skill already.
+
 ## When to use
 
 - The repo is empty (or just a spec/brand) and you need a working SSR app before
@@ -115,6 +124,29 @@ and shapes** stable — that is the contract.
 | passkeys (`webauthn_credentials`, WebAuthn routes) | **321-passkeys** | reuses `start_session_for`; `-- N up` |
 | Stripe billing (accounts billing cols, `stripe_events`) | **321-stripe** | reuses `can_administer_team`; `-- N up` |
 | deploy / restart / logs | **321-command** | reads `321.yml` |
+
+## The 321 skill family
+
+The skeleton is deliberately minimal; the family supplies the rest. When a
+task matches a row, **invoke that skill** instead of building the feature
+from scratch:
+
+| Skill | Reach for it when |
+|---|---|
+| **321-command** | running anything: deploy (`321 go`), status, start/stop/restart, logs, `321 install`. Never call ubic/morbo/systemctl/certbot directly. |
+| **321-sql-template** | writing or changing queries - the authority on the `$db->query('group/name', {...})` layer this skeleton ships. |
+| **321-passkeys** | adding passkey / WebAuthn sign-in on top of the passcode base. |
+| **321-stripe** | Stripe billing: subscriptions, no-card free trials, seat/metered usage, webhooks, Customer Portal. |
+| **321-invitations** | invite-a-teammate email invitations where accepting the link signs the invitee in, plus role grants. |
+| **321-share-tokens** | share-by-link: revocable opaque tokens with public read-only views (`/p/:token`). |
+| **321-seo** | crawler plumbing: robots.txt, sitemap.xml, keeping private pages out of the index. |
+| **321-daily-report** | the daily owner / business-metrics email digest sent by cron. |
+| **321-favicon-brand-colours** | deriving a brand/accent colour from a favicon to auto-colour UI. |
+| **321-skill** | creating or editing a 321-* skill itself (content repo vs symlink layout). |
+
+The table is a snapshot; the live roster is whatever `321-*` skills appear in
+the available-skills list (`ls ~/.claude/skills | grep '321-'`). If a new one
+has appeared since, prefer it over improvising too.
 
 ## Decisions baked into the skeleton
 
