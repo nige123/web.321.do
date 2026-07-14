@@ -1,0 +1,12 @@
+-- Ported from favsix.com sql/favarrays/list_public_sitemap.sql.ep.
+-- Adapt table/column names; keep the shape: public rows ONLY, lastmod
+-- formatted in SQL, zero binds. Lives in the 321-sql-template layer
+-- (call as $db->query('favarrays/list_public_sitemap')) or inline it
+-- as a plain query.
+   SELECT a.handle,
+          f.slug,
+          to_char(f.updated_at, 'YYYY-MM-DD') AS lastmod
+     FROM favarrays f
+     JOIN accounts a ON a.account_id = f.account_id
+    WHERE f.visibility = 'public'
+ ORDER BY f.updated_at DESC, f.array_id DESC

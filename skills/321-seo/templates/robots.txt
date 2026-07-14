@@ -1,0 +1,19 @@
+# Ported from favsix.com (shipped 2026-07-14). Adapt the Disallow list to
+# your app's non-content surface and hardcode YOUR live origin in the
+# Sitemap line. Drop this file in public/ - no route needed; Mojolicious
+# serves static files before the router. Strip these comment lines or
+# keep them; crawlers ignore # comments either way.
+
+User-agent: *
+Allow: /
+Disallow: /add
+Disallow: /api/
+Disallow: /auth/
+Disallow: /billing/
+Disallow: /embed/
+Disallow: /health
+Disallow: /invite/
+Disallow: /passkeys/
+Disallow: /stripe/
+
+Sitemap: https://favsix.com/sitemap.xml
