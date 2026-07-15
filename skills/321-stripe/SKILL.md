@@ -84,6 +84,11 @@ the app's namespace. Templates referenced by name live in `templates/`.
    `stripe_events` table (idempotency/audit), and a partial index on
    `stripe_customer_id`. Bump the migration number + its version test; add
    `stripe_events` to the test-harness truncate list.
+   The partial unique index (`accounts_stripe_customer_uidx ... WHERE
+   stripe_customer_id IS NOT NULL`) is load-bearing, not decorative: the
+   webhook writer resolves the account BY `stripe_customer_id` on every
+   event, so dropping it turns each webhook into a table scan - never remove
+   it. Index reasoning for anything else you add: **321-db-speed**.
 3. **Thin REST client** (`templates/Stripe-Client.pm`): blocking Mojo::UserAgent
    over the Stripe REST API; **inert (`enabled` false) when no secret key** so
    the suite never touches the network; a `request_handler` **test seam**

@@ -6,6 +6,10 @@
 --   321-stripe   -> "-- 2 up": accounts billing columns + stripe_events table
 --   321-passkeys -> "-- 3 up": webauthn_credentials + users.webauthn_user_handle
 -- When you adopt one, give it the next free number and bump t/01-migration.t.
+--
+-- Every index below names the read path it serves - the 321-db-speed rule:
+-- a schema change ships with the indexes its reads need, and Postgres does
+-- NOT auto-index foreign-key columns.
 
 -- 1 up
 
@@ -26,7 +30,9 @@ CREATE TABLE passcodes (
     consumed_at TIMESTAMPTZ,
     created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-CREATE INDEX passcodes_email_idx ON passcodes(email);
+-- serves: passcodes/verify (newest code per email, ORDER BY created_at DESC)
+-- and passcodes/issue's rate-limit lookback - a latest-N-per-key composite.
+CREATE INDEX passcodes_email_created_idx ON passcodes(email, created_at DESC);
 
 -- database-backed session tokens. Only the sha256 hash of the token is stored;
 -- the raw token lives in the signed 'l2d_session' cookie. Server-side rows
@@ -39,6 +45,10 @@ CREATE TABLE sessions (
     expires_at         TIMESTAMPTZ NOT NULL,
     revoked_at         TIMESTAMPTZ
 );
+-- session_token_hash UNIQUE already serves the hot resolve path. The user_id
+-- FK needs its own index: it serves the users ON DELETE CASCADE fan-out and
+-- any sign-out-everywhere revocation, and sessions grows with every sign-in.
+CREATE INDEX sessions_user_idx ON sessions(user_id);
 
 -- public identity: personal + team accounts share one handle namespace, one
 -- membership table, one billing surface. A user has exactly one personal
@@ -56,6 +66,10 @@ CREATE TABLE accounts (
 );
 CREATE UNIQUE INDEX accounts_one_personal_per_user
     ON accounts(owner_user_id) WHERE kind = 'personal';
+-- owner_user_id (FK) deliberately has no plain index: the only owner-side
+-- read is accounts/personal_for_user, which the partial index above serves
+-- exactly (same predicate); team lookups go through account_members; and the
+-- baseline has no delete-user flow to fan out. Written down per 321-db-speed.
 
 -- team membership + role (owner > admin > member). See L2D::Auth::Roles.
 CREATE TABLE account_members (

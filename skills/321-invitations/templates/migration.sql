@@ -1,5 +1,8 @@
--- Migration 5: organisation_invitations — invite a teammate to an organisation
+-- Migration 5: organisation_invitations - invite a teammate to an organisation
 -- by email, accept (granting the role), or revoke. Tokens expire after 7 days.
+--
+-- Indexes (321-db-speed): `token UNIQUE` is the accept path's lookup; the
+-- org FK index serves the Team page's pending list and the org cascade.
 
 CREATE TABLE IF NOT EXISTS organisation_invitations (
     invitation_id      BIGSERIAL PRIMARY KEY,
@@ -13,4 +16,4 @@ CREATE TABLE IF NOT EXISTS organisation_invitations (
     expires_at         TIMESTAMPTZ NOT NULL,
     created_at         TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-CREATE INDEX IF NOT EXISTS idx_org_invitations_org ON organisation_invitations(organisation_id);
+CREATE INDEX IF NOT EXISTS organisation_invitations_org_idx ON organisation_invitations(organisation_id);

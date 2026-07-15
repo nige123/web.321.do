@@ -44,7 +44,10 @@ summary, not a pager).
    adaptation point**: keep `_day_axis` / `_pivot` / `_trend` verbatim, swap
    the favsix tables for YOUR growth / engagement / billing metrics. Date
    filters stay in SQL as `AT TIME ZONE 'Europe/London'` casts - never Perl
-   date math.
+   date math. Every series must stay date-bounded and index-backed (a
+   `created_at` index on any table a series scans) so the 07:00 cron does
+   not grow into a full-table scan as history accumulates - see
+   **321-db-speed**.
 3. Add the sender methods to your baseline `Email::Sender`; replace `_shell`
    with the preheader-aware one so every app email keeps one livery. Subject =
    `<App> daily - <date>: <headline numbers>`, plain hyphens (no em-dashes

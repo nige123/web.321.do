@@ -59,6 +59,12 @@ Work test-first. Each step has a template; `<NS>` = the app's namespace.
 2. **Migration** (`templates/migration.sql`): `webauthn_credentials` table +
    `users.webauthn_user_handle`. Bump the migration version + its test; add
    `webauthn_credentials` to the test-harness truncate list.
+   Retrieval speed (see **321-db-speed**): the `credential_id` PRIMARY KEY
+   serves the sign-in lookup, and `webauthn_credentials_user_id_idx` serves
+   the settings manage list. If you adapt the challenge transport from the
+   session cookie to a table (the API-split variant), delete-on-use goes by
+   PK, and the expiry purge wants an `expires_at` index if the table can
+   accumulate between purges.
 3. **Model** (`templates/Model-Passkeys.pm`, `templates/sql/*.sql.ep`): CRUD.
    Plus, on your users model, `ensure_webauthn_handle($user_id)` (lazy random
    handle) and `by_webauthn_handle`. Note the `RETURNING` + count trick for

@@ -74,6 +74,17 @@ see gotchas).
 - **Read results** with the usual Mojo::Pg result API: `->hash`,
   `->hashes->to_array`, `->expand->hash`. See `templates/usage.pl`.
 
+## Fast retrieval
+
+Every new `.sql.ep` names its supporting index in a header comment - e.g.
+`-- index: tile_clicks_array_created_idx (array_id, created_at DESC)` - or
+says why none is needed ("bounded table, ~200 rows"). EXPLAIN ANALYZE the
+worst realistic case before shipping, not the friendly one. Two traps that
+look fine in a template: a LATERAL whose correlation key is unindexed (the
+inner scan repeats once per outer row), and a leading-wildcard `ILIKE '%q%'`
+(can never use a btree; a pg_trgm GIN index is the fix). The full discipline,
+red flags and pattern library: the **321-db-speed** skill.
+
 ## Decisions baked into the engine
 
 - **Two layers, not one.** Mojo::Template handles structure/logic; the `[bind]`

@@ -96,7 +96,10 @@ t/…                         Test::L2D harness + 00-load, 01-migration, 02-auth
 
 4. **Create the databases:** `createdb yourslug` and `createdb yourslug_test`.
    `auto_migrate(1)` applies `db/migration.sql` on first DB use — no manual
-   migrate step.
+   migrate step. When you later extend the schema: every FK column and every
+   new read path gets an index, or a written "none needed, because ..." -
+   see the **321-db-speed** skill. The baseline migration models this
+   discipline: each index comment names the read path it serves.
 
 5. **Run the tests:** `MOJO_CONFIG=t/conf/test.conf PERL5LIB=local/lib/perl5 prove -lr -It/lib t`
    — 00-load, 01-migration, 02-auth (the full passcode → session flow) should be
@@ -135,6 +138,7 @@ from scratch:
 |---|---|
 | **321-command** | running anything: deploy (`321 go`), status, start/stop/restart, logs, `321 install`. Never call ubic/morbo/systemctl/certbot directly. |
 | **321-sql-template** | writing or changing queries - the authority on the `$db->query('group/name', {...})` layer this skeleton ships. |
+| **321-db-speed** | any migration, new query, or column that queries will filter on - every DB change ships with the indexes its read paths need; slow routes. |
 | **321-passkeys** | adding passkey / WebAuthn sign-in on top of the passcode base. |
 | **321-stripe** | Stripe billing: subscriptions, no-card free trials, seat/metered usage, webhooks, Customer Portal. |
 | **321-invitations** | invite-a-teammate email invitations where accepting the link signs the invitee in, plus role grants. |

@@ -48,6 +48,11 @@ Magic-link accept makes all of that one POST.
    (unlike share tokens): it is single-use, short-lived, and revocable, and
    `resend` must re-email it. Hash-at-rest is a fine hardening if you accept
    losing nothing (resend rotates anyway).
+   Either way, token resolution is a unique-index-backed lookup, never a
+   scan: `token UNIQUE` is both the integrity constraint and the accept
+   path's index. If you do take the hash-at-rest hardening, the lookup is BY
+   the stored hash, so the unique index moves to the hash column with it.
+   See **321-db-speed**.
 2. Port the service. `%INVITABLE_ROLE` is the adaptation point - whitelist
    YOUR roles. Virtual composite roles cost two lines: whitelist the key,
    expand it in `accept()` (e.g. admin -> checker + payer). The virtual key

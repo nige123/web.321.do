@@ -43,6 +43,11 @@ Add a type = add two SQL files + one map row + one public route/template.
 
 1. Migration block: `share_tokens` with YOUR resource types in the CHECK; bump
    the migration-version test; add the table to the harness truncate list.
+   Retrieval speed: `token_hash UNIQUE` is both integrity and THE lookup
+   path - `resolve` is an index hit on the stored hash, never a scan
+   (hash-at-rest tokens are looked up BY the hash, so the unique index lives
+   on the hash column) - and `share_tokens_resource_idx` serves the
+   per-resource listing. See **321-db-speed**.
 2. Port the model; fill in the type map; write each type's `*_owned` (id +
    user_id -> row) and `*_public` (ONLY anonymously-safe columns) queries.
 3. Controller: `create` flashes the full share URL (base_url + prefix + raw
