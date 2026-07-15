@@ -48,7 +48,7 @@ passcode-first by design — passkeys are added later as a faster path).
 
 ```
 bin/l2d                     entry script (sets MOJO_HOME/MODE/CONFIG + reverse-proxy; starts L2D::Web)
-cpanfile                    Mojolicious, Mojo::Pg>=5, Minion, Nanoid (versions pinned)
+cpanfile                    Mojolicious, Mojo::Pg>=5, Minion, Nanoid, Crypt::URandom (versions pinned)
 321.yml                     service manifest for `321 go` (web + minion worker)
 .gitignore                  ignores local/, logs, conf/secrets.local.conf
 conf/development.conf       hashref config; merges conf/secrets.local.conf via $MOJO_HOME
@@ -152,7 +152,10 @@ has appeared since, prefer it over improvising too.
 
 - **Passcode-first auth, no passwords.** A 6-digit code (sha256-hashed at rest)
   proves the email; `find_or_create_by_email` makes the user. Passkeys come
-  later as a faster path, never a prerequisite.
+  later as a faster path, never a prerequisite. The code is drawn from the OS
+  CSPRNG (`Crypt::URandom`) with rejection sampling - never `rand()`, and
+  never a bare `% 1_000_000` of a 32-bit draw, which biases low codes
+  (modulo bias). See gotchas.
 - **Two cookies, two jobs.** The Mojolicious signed-cookie session (`l2d`) holds
   only transient flow state (sign-in email in flight) and is **host-only**.
   Login persistence is a **separate DB-backed `l2d_session` cookie** carrying a

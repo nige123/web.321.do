@@ -9,6 +9,7 @@ package L2D::Auth::Passcodes;
 
 use Mojo::Base -base, -signatures;
 use Digest::SHA qw(sha256_hex);
+use Crypt::URandom qw(urandom);
 
 has 'db';      # L2D::DB
 
@@ -22,6 +23,20 @@ sub normalise_email ($self, $email) {
 }
 
 #------------------------------------------------------------------------------
+# _random_code - uniform 0..999999 from the OS CSPRNG. A login OTP must never
+#   come from perl's rand() (seedable, predictable). And a raw 32-bit draw
+#   reduced % 1_000_000 is biased low, because 2**32 is not an exact multiple
+#   of the range: rejection-sample instead - redraw whenever the value lands
+#   at or above the largest exact multiple (4_294_000_000, ~0.02% of draws),
+#   and only then take the modulo.
+#------------------------------------------------------------------------------
+sub _random_code ($self) {
+    my $n;
+    do { $n = unpack 'N', urandom(4) } while $n >= 4_294_000_000;
+    return $n % 1_000_000;
+}
+
+#------------------------------------------------------------------------------
 # issue - generate + store a hashed passcode for an email. Returns the
 #   plaintext code (to email) on success, or an error hash.
 #------------------------------------------------------------------------------
@@ -32,7 +47,7 @@ sub issue ($self, $email, $user_agent = undef, $ip_address = undef) {
     return { ok => 0, error => 'invalid_email' }
         unless $email =~ /\A[^@\s]+@[^@\s]+\z/;
 
-    my $code = sprintf '%06d', int(rand(1_000_000));
+    my $code = sprintf '%06d', $self->_random_code;
 
     my $row = $self->db->query('passcodes/issue', {
         email => $email,

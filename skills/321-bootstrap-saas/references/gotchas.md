@@ -72,6 +72,23 @@ Store only `sha256_hex` of the 6-digit code and of the session token. The
 plaintext code exists only in the email + memory; the raw token only in the
 signed cookie. A `passcodes` or `sessions` table full of plaintext is the bug.
 
+## Passcode randomness: CSPRNG + rejection sampling, never rand()
+
+`int(rand(1_000_000))` looks fine and is the bug twice over. perl's `rand()`
+is a seedable, non-cryptographic PRNG - an attacker who can reconstruct the
+seed can predict login OTPs, which is account takeover with nothing but an
+email address. Draw from the OS CSPRNG instead (`Crypt::URandom::urandom`;
+`Crypt::PRNG` from CryptX is equally fine once 321-passkeys pulls CryptX in).
+
+The subtler half: `unpack('N', urandom(4)) % 1_000_000` is *still* wrong.
+2**32 is not an exact multiple of 1e6, so the leftover 967,296 values wrap
+around and make low codes slightly more likely (modulo bias). Rejection-sample
+as `_random_code` in `Auth/Passcodes.pm` does: redraw while the 32-bit value
+lands at or above the largest exact multiple of the range (4_294_000_000),
+and only then take the modulo. Same rule for any ranged secret a later
+feature adds - the session/invite/share tokens avoid it by construction
+(Nanoid draws per-character from `Bytes::Random::Secure`).
+
 ## Test DB reset must also drain Minion
 
 `reset_db` truncates the tables **and** calls `$app->minion->reset({all=>1})`.
