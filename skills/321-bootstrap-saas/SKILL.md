@@ -184,6 +184,16 @@ has appeared since, prefer it over improvising too.
   `&ndash;` or `&mdash;` in templates, code comments, user-facing copy, README
   or commit messages - write a plain hyphen (" - ") instead. Typographic
   middots as brand marks are fine; long dashes are not.
+- **Non-ASCII in a Perl source file needs `use utf8`.** The skeleton is
+  deliberately all-ASCII (see the dash rule), so no module declares it. But the
+  moment a `.pm`, `.t` or `t/lib/*.pm` file gains a real non-ASCII literal - a
+  `£` in a currency label, a `·` middot in a test regex, an accented name - it
+  MUST add `use utf8;` alongside the other pragmas. Without it Perl reads the
+  file as Latin-1, so the two UTF-8 bytes of `£` decode as two characters and
+  every downstream render shows `Â£`. Prefer ASCII; when the character is
+  genuinely needed (currency is the usual case), add the pragma. `.t` files are
+  the classic offender - they rarely carry it, and a test whose *expected*
+  string is equally mojibaked passes for the wrong reason. See gotchas.
 - **Every source file opens with the copyright header.**
   `# Copyright Nige Ltd. Author: Nigel Hamilton.` is line 1 of every Perl
   module, script, test and conf file (line 2 under a shebang); `/* ... */`

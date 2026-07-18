@@ -142,3 +142,39 @@ Two defences, both now baked in:
 General rule when renaming any skeleton: never embed one placeholder inside
 another (a URL containing the example domain is two placeholders in one
 string), and always end a rename with a residue grep for every sentinel.
+
+## Non-ASCII literal without `use utf8` renders as `Â£`
+
+A `.pm` or `.t` that contains a literal `£` (or `·`, `é`, any byte above
+0x7F) but does **not** `use utf8` is read by Perl as Latin-1: the two UTF-8
+bytes of `£` (`C2 A3`) become the two characters `Â` + `£`. Mojolicious then
+UTF-8-encodes the response, so the browser (or email) shows **`Â£`** - textbook
+double-encode mojibake. It stays invisible until that exact string reaches a
+page: the module loads, the tests pass, nothing warns.
+
+```perl
+# a label in a module WITHOUT use utf8:
+[ nearest_1 => 'Nearest pound (£1.00)' ],   # renders "Â£1.00"
+```
+
+Fix: declare the source encoding with the other pragmas at the top of the file.
+
+```perl
+use strict;
+use warnings;
+use utf8;      # this file has a literal £
+```
+
+The `.t` trap is worse because it hides itself: a test asserting on that label
+without `use utf8` has an *expected* string that is **also** mojibaked, so both
+sides match and the test goes green while the page is broken. Don't trust the
+green - verify the bytes:
+
+```bash
+perl -Ilib -MYour::Module -e 'print Your::Module::label()' | xxd | grep -i 'c2 a3'
+```
+
+`c2 a3` present once per `£` = correct UTF-8. `c3 82 c2 a3` = the `Â£` double
+encode. House default is still ASCII (the dash rule in SKILL.md); reach for
+`use utf8` only when a character like `£` is genuinely required - then put it in
+*every* file that carries the literal, source and test alike.

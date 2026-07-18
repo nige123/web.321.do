@@ -48,7 +48,10 @@ messages let a link holder probe which tokens were real.
 ## Middot in test regexes
 
 The `.t` files are not `use utf8`; a literal `·` in a regex mis-encodes and
-never matches the rendered " · expired" meta. Use `\x{b7}` in the pattern.
+never matches the rendered " · expired" meta. Use `\x{b7}` in the pattern - it
+sidesteps the trap without touching the file's encoding. (This is the general
+non-ASCII / `use utf8` mojibake trap; see 321-bootstrap-saas gotchas. The other
+fix is to `use utf8` in the test and write the literal `·`.)
 
 ## Validate BEFORE sign_in_verified
 
