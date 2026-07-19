@@ -21,7 +21,7 @@ sub run ($self, @args) {
         say "Running tests before deploy...";
         say "";
         my $local = Deploy::Local->new;
-        my $r = $local->stream("cd $svc->{repo} && $svc->{test}");
+        my $r = $local->stream($self->test_command($svc));
         unless ($r->{ok}) {
             say "";
             say "  \e[31mTests failed - deploy aborted\e[0m";

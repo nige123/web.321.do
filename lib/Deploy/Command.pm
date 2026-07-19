@@ -172,6 +172,16 @@ dev:
 YAML
 }
 
+# Build the manifest test: invocation. The suite runs with the repo's bundled
+# local-lib on @INC and its bin/ on PATH - the same env every other execution
+# path (deploy steps, ubic files, `321 do`) already exports. A bare
+# `test: prove -lr t` would otherwise run against ambient site_perl instead of
+# the deps the deploy actually ships.
+sub test_command ($self, $svc) {
+    my $repo = $svc->{repo};
+    return "cd $repo && PERL5LIB=$repo/local/lib/perl5 PATH=$repo/local/bin:\$PATH $svc->{test}";
+}
+
 sub ensure_fresh_ubic ($self, $name, $transport) {
     return if $transport && $transport->isa('Deploy::SSH');
     my $r = $self->ubic->regenerate_if_stale($name);

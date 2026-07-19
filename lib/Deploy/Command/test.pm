@@ -33,7 +33,7 @@ sub _test_one ($self, $name, $target) {
     say "";
 
     my $transport = $self->transport_for($name, $target);
-    my $r = $transport->stream("cd $svc->{repo} && $test_cmd");
+    my $r = $transport->stream($self->test_command($svc));
 
     if ($r->{ok}) {
         say "";
@@ -55,6 +55,10 @@ sub _test_one ($self, $name, $target) {
   Run tests for a service. The test command is configured in 321.yml:
 
     test: prove -lr t
+
+  The command runs inside the repo with the bundled local-lib pinned
+  (PERL5LIB=<repo>/local/lib/perl5, <repo>/local/bin on PATH) - the same
+  env deploys and ubic services get, so a bare `prove -lr t` just works.
 
   321 test 123.api         # run tests locally
   321 test 123             # run tests for all 123.* services
