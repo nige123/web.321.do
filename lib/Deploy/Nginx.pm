@@ -44,6 +44,11 @@ sub generate ($self, $name) {
     return { status => 'error', message => "No port configured for $name" } unless $port;
     return { status => 'error', message => "Invalid hostname: $host" } unless $self->_valid_host($host);
 
+    my @aliases = @{ $svc->{aliases} // [] };
+    for my $alias (@aliases) {
+        return { status => 'error', message => "Invalid alias: $alias" } unless $self->_valid_host($alias);
+    }
+
     my $provider = $self->cert_provider->pick($self->config->target);
     my $paths    = $self->cert_provider->cert_paths(provider => $provider, host => $host);
     # /etc/letsencrypt/live/ is root-readable; sudo so unprivileged probes work.
@@ -52,7 +57,7 @@ sub generate ($self, $name) {
     # force_https defaults true: HTTP redirects to HTTPS when SSL is set up.
     # Set force_https: false in 321.yml for APIs that should answer on HTTP too.
     my $force_https = $svc->{force_https} // 1;
-    my $conf = $self->_render_config($host, $port, $has_ssl, $paths, $force_https);
+    my $conf = $self->_render_config($host, $port, $has_ssl, $paths, $force_https, \@aliases);
 
     my $dest = $self->sites_available . "/$host";
 
@@ -140,13 +145,22 @@ sub acquire_cert ($self, $name) {
     my $host = $svc->{host} // 'localhost';
     return { status => 'error', message => "Invalid hostname: $host" } unless $self->_valid_host($host);
 
+    my @aliases = grep { $self->_valid_host($_) } @{ $svc->{aliases} // [] };
+
     my $provider = $self->cert_provider->pick($self->config->target);
     my $paths    = $self->cert_provider->cert_paths(provider => $provider, host => $host);
 
-    return { status => 'ok', message => 'SSL cert already exists' }
-        if $self->_file_exists($paths->{cert}, sudo => 1);
+    if ($self->_file_exists($paths->{cert}, sudo => 1)) {
+        return { status => 'ok', message => 'SSL cert already exists' } unless @aliases;
 
-    my $cmd = $self->cert_provider->acquire_cmd(provider => $provider, host => $host);
+        # Cert exists but may predate the aliases - re-acquire only if a
+        # configured alias is missing from its SAN list.
+        my $sans = $self->_run("sudo openssl x509 -in $paths->{cert} -noout -ext subjectAltName")->{output} // '';
+        my @missing = grep { $sans !~ /DNS:\Q$_\E(?![\w.-])/i } @aliases;
+        return { status => 'ok', message => 'SSL cert already covers aliases' } unless @missing;
+    }
+
+    my $cmd = $self->cert_provider->acquire_cmd(provider => $provider, host => $host, aliases => \@aliases);
     my $r   = $self->_run($cmd);
     return { status => ($r->{ok} ? 'ok' : 'error'), output => $r->{output}, provider => $provider };
 }
@@ -242,7 +256,8 @@ sub probe_cert ($self, $host) {
     };
 }
 
-sub _render_config ($self, $host, $port, $has_ssl, $paths, $force_https = 1) {
+sub _render_config ($self, $host, $port, $has_ssl, $paths, $force_https = 1, $aliases = []) {
+    my $names = join ' ', $host, @$aliases;
     my $proxy_block = <<"NGINX";
     access_log /var/log/nginx/${host}.access.log;
     error_log  /var/log/nginx/${host}.error.log;
@@ -273,17 +288,42 @@ NGINX
 server {
     listen 80;
     listen [::]:80;
-    server_name $host;
+    server_name $names;
 
 $acme_block
 NGINX
 
     if ($has_ssl && $force_https) {
-        $conf .= "    location / { return 301 https://\$host\$request_uri; }\n}\n\n";
+        # Literal canonical host, not \$host: aliases (e.g. www) go straight
+        # to the canonical HTTPS site in one hop.
+        $conf .= "    location / { return 301 https://$host\$request_uri; }\n}\n\n";
     } else {
         # Either no cert, or force_https is off - proxy_pass through HTTP.
         $conf .= $proxy_block;
         $conf .= "\n" if $has_ssl;
+    }
+
+    if ($has_ssl && @$aliases) {
+        # Aliases answer HTTPS on the shared cert, then redirect to the
+        # canonical host so there's one public URL per page.
+        my $alias_names = join ' ', @$aliases;
+        $conf .= <<"NGINX";
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    server_name $alias_names;
+
+    ssl_certificate     $paths->{cert};
+    ssl_certificate_key $paths->{key};
+
+    ssl_protocols TLSv1.2;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+    ssl_prefer_server_ciphers on;
+
+    return 301 https://$host\$request_uri;
+}
+
+NGINX
     }
 
     if ($has_ssl) {

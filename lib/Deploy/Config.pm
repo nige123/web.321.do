@@ -123,6 +123,7 @@ sub _resolve ($self, $name, $manifest) {
         ($manifest->{test}     ? (test     => $manifest->{test})     : ()),
         ($manifest->{favicon}  ? (favicon  => $manifest->{favicon})  : ()),
         (exists $manifest->{force_https} ? (force_https => $manifest->{force_https}) : ()),
+        (($target->{aliases} // $manifest->{aliases}) ? (aliases => $target->{aliases} // $manifest->{aliases}) : ()),
         ($target->{ssh}        ? (ssh      => $target->{ssh})        : ()),
         ($target->{ssh_key}    ? (ssh_key  => $target->{ssh_key})    : ()),
         ($target->{docs}       ? (docs     => $target->{docs})       : ()),

@@ -31,24 +31,31 @@ sub cert_paths ($self, %o) {
 
 sub acquire_cmd ($self, %o) {
     my ($provider, $host) = @o{qw(provider host)};
-    my $paths  = $self->cert_paths(%o);
+    my @aliases = @{ $o{aliases} // [] };
+    my $paths   = $self->cert_paths(%o);
 
     if ($provider eq 'mkcert') {
         my $caroot = $self->mkcert_dir;
         my $dir    = $self->ssl_dir;
+        my $names  = join ' ', $host, @aliases;
         return "sudo install -d -m 755 $dir && "
              . "sudo CAROOT=$caroot mkcert "
              . "-cert-file $paths->{cert} "
              . "-key-file $paths->{key} "
-             . "$host && "
+             . "$names && "
              . "sudo chgrp www-data $paths->{key} && "
              . "sudo chmod 640 $paths->{key}";
     }
 
     # --webroot lets certbot renew without stopping nginx. The acme-challenge
     # location in our nginx template serves /var/www/letsencrypt/.well-known.
+    # With aliases, --cert-name pins the lineage to the canonical host (so
+    # cert_paths stay stable) and --expand grows an existing cert's SAN list.
+    my $domains = join ' ', map { "-d $_" } $host, @aliases;
+    my $expand  = @aliases ? "--cert-name $host --expand " : '';
     return "sudo mkdir -p /var/www/letsencrypt && "
-         . "sudo certbot certonly --webroot -w /var/www/letsencrypt -d $host "
+         . "sudo certbot certonly --webroot -w /var/www/letsencrypt $domains "
+         . $expand
          . "--non-interactive --agree-tos -m admin\@$host";
 }
 

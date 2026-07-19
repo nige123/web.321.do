@@ -15,9 +15,10 @@ sub run ($self, @args) {
     $self->config->target($target);
     my $transport = $self->transport_for($name, $target);
 
-    my $svc  = $self->config->service($name);
-    my $host = $svc->{host} // 'localhost';
-    my $port = $svc->{port};
+    my $svc     = $self->config->service($name);
+    my $host    = $svc->{host} // 'localhost';
+    my $port    = $svc->{port};
+    my @aliases = @{ $svc->{aliases} // [] };
 
     unless ($host ne 'localhost' && $port) {
         say "  No host/port configured for $name ($target)";
@@ -29,6 +30,7 @@ sub run ($self, @args) {
     my $status = $self->nginx->status($name);
     say "  $name ($target)";
     say "  host:    $host";
+    say "  aliases: @aliases" if @aliases;
     say "  port:    $port";
     say "  config:  " . ($status->{config_exists} ? "\e[32mexists\e[0m" : "\e[31mmissing\e[0m");
     say "  enabled: " . ($status->{enabled} ? "\e[32myes\e[0m" : "\e[31mno\e[0m");
@@ -56,8 +58,9 @@ sub run ($self, @args) {
         }
     }
 
-    # SSL cert
-    unless ($status->{ssl}) {
+    # SSL cert. With aliases configured, always ask - acquire_cert is
+    # idempotent and expands an existing cert that doesn't cover them yet.
+    if (!$status->{ssl} || @aliases) {
         my $provider = $self->nginx->cert_provider->pick($target);
         say "  Requesting SSL certificate via $provider...";
         my $cert = $self->nginx->acquire_cert($name);
