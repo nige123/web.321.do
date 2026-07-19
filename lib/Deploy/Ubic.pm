@@ -165,7 +165,13 @@ my \$live_pid = sub {
 };
 
 Ubic::Service::Common->new({
-    start => sub { system('/bin/sh', '-c', \$start_cmd) },
+    start => sub {
+        system('/bin/sh', '-c', \$start_cmd);
+        # A slow boot (e.g. startup migrations) writes the pidfile well after
+        # the shell returns - wait for a live manager so a cold start never
+        # reports a false "not running" to ubic or the deploy step.
+        for (1 .. 60) { last if \$live_pid->(); sleep 1 }
+    },
     stop  => sub {
         my \$pid = \$live_pid->() or return;
         kill 'QUIT', \$pid;

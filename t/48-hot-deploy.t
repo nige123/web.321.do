@@ -152,6 +152,39 @@ subtest 'hypnotoad services render as self-supervising Common files' => sub {
     like $file, qr/QUIT/,                         'stop sends graceful QUIT';
 };
 
+subtest 'cold start waits out a slow boot (startup migrations)' => sub {
+    # An app that runs DB migrations at boot writes the hypnotoad pidfile
+    # seconds after the start shell returns. A fire-and-forget start makes
+    # ubic's immediate status check report a false "not running" - seen live
+    # on love.web 2026-07-19. The generated start must wait for a live
+    # manager pid before returning. Behavioural check: eval the real
+    # rendered coderefs, with only the shell command swapped for a slow-boot
+    # simulator that writes its pid 3s in.
+    my $tmp     = tempdir(CLEANUP => 1);
+    my $pidfile = path($tmp, 'demo-web.pid');
+    my ($scan)  = make_scan(pid_file => "$pidfile");
+    my $cfg     = make_config($scan);
+    my $ubic    = Deploy::Ubic->new(config => $cfg);
+
+    my $file = $ubic->_render_service_file('demo.web', $cfg->service('demo.web'));
+    my $boot = "sh -c 'sleep 3; echo \$\$ > $pidfile; sleep 10' >/dev/null 2>&1 &";
+    my $lit  = $boot =~ s/([\\'])/\\$1/gr;
+    $file =~ s/^my \$start_cmd = '.*';$/my \$start_cmd = '$lit';/m
+        or die 'could not swap start_cmd in the rendered file';
+
+    my $svc_obj = eval $file;
+    die $@ if $@;
+
+    eval { $svc_obj->start };
+    diag "start threw: $@" if $@;
+    is $svc_obj->status->status, 'running',
+        'status is running the moment start returns, even after a 3s boot';
+
+    my $booted = $pidfile->exists ? $pidfile->slurp : 0;
+    $booted =~ s/\s+//g if $booted;
+    kill 'TERM', $booted if $booted;
+};
+
 subtest 'morbo and worker services keep the SimpleDaemon form' => sub {
     my ($scan) = make_scan();
     my $cfg  = make_config($scan);
