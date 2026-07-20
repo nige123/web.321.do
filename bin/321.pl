@@ -98,6 +98,35 @@ helper validate_service => sub ($c, $name) {
     return 1;
 };
 
+# --- Auth ---
+
+# HTTP Basic Auth in production only; dev is open and /health is always public.
+# Credentials come from $ENV{DEPLOY_AUTH} ("user:pass"), defaulting to the
+# documented 321:kaizen - set a strong DEPLOY_AUTH in the live environment to
+# harden without committing a secret. Accepted via the Authorization header or
+# https://user:pass@host/ URL userinfo. (Stripped in b0596a6; restored with a
+# pin in t/51-auth.t so it can't silently vanish again.)
+my $auth_userpass = $ENV{DEPLOY_AUTH} // '321:kaizen';
+
+under '/' => sub ($c) {
+    return 1 if $c->req->url->path->to_string eq '/health';
+    return 1 if app->mode eq 'development';
+
+    my $url_userinfo = $c->req->url->to_abs->userinfo // '';
+    return 1 if $url_userinfo eq $auth_userpass;
+
+    if (my $header = $c->req->headers->authorization) {
+        if ($header =~ /^Basic\s+(.+)$/) {
+            require MIME::Base64;
+            return 1 if MIME::Base64::decode_base64($1) eq $auth_userpass;
+        }
+    }
+
+    $c->res->headers->www_authenticate('Basic realm="321.do"');
+    $c->render(text => 'Authentication required', status => 401);
+    return 0;
+};
+
 # --- Routes ---
 
 # Health check (no auth required)

@@ -115,7 +115,7 @@ The target is whichever argument names a known target (`dev`/`live`); tokens bef
 
 ### Auth
 
-HTTP Basic Auth required in production — credentials `321:kaizen`. Accepted via `Authorization: Basic …` header or `https://321:kaizen@…` URL userinfo. Auth is skipped in development mode and `/health` is always public.
+HTTP Basic Auth required in production. Credentials come from `$ENV{DEPLOY_AUTH}` (`user:pass`), defaulting to `321:kaizen`; set a strong `DEPLOY_AUTH` in the live environment to harden without committing a secret. Accepted via `Authorization: Basic …` header or `https://user:pass@…` URL userinfo. Auth is skipped in development mode and `/health` is always public. The boundary is the `under '/'` hook in `bin/321.pl`, pinned by `t/51-auth.t` — it was silently stripped once (commit `b0596a6`) and the test now makes that impossible.
 
 ## Dev parity
 
