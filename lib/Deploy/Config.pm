@@ -122,6 +122,7 @@ sub _resolve ($self, $name, $manifest) {
         ($pid_file             ? (pid_file => $pid_file)             : ()),
         ($manifest->{test}     ? (test     => $manifest->{test})     : ()),
         ($manifest->{favicon}  ? (favicon  => $manifest->{favicon})  : ()),
+        ($manifest->{gobin}    ? (gobin    => $manifest->{gobin})    : ()),
         (exists $manifest->{force_https} ? (force_https => $manifest->{force_https}) : ()),
         (($target->{aliases} // $manifest->{aliases}) ? (aliases => $target->{aliases} // $manifest->{aliases}) : ()),
         ($target->{ssh}        ? (ssh      => $target->{ssh})        : ()),
