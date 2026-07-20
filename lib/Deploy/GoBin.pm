@@ -84,4 +84,35 @@ sub resolve_config_path ($self, $version, %opt) {
     return ($gen->stringify, 1);
 }
 
+sub empty_manifest ($name) {
+    return { name => $name, latest => undef, min_supported => undef, builds => {} };
+}
+
+sub manifest_add_build ($self, $m, %a) {
+    $m->{builds}{ $a{version} } = $a{arches};
+    $m->{latest}        = $a{version};
+    $m->{min_supported} = $a{min_supported};
+    return $m;
+}
+
+sub _versions_desc ($m) {
+    return sort { semver_cmp($b, $a) } keys %{ $m->{builds} };
+}
+
+sub manifest_prune ($self, $m, $retain) {
+    my @keep = (_versions_desc($m))[0 .. $retain - 1];
+    my %keep = map { $_ => 1 } grep { defined } @keep;
+    $keep{ $m->{latest} } = 1 if defined $m->{latest};   # never drop latest
+    delete $m->{builds}{$_} for grep { !$keep{$_} } keys %{ $m->{builds} };
+    return $m;
+}
+
+sub manifest_rollback ($self, $m) {
+    my @desc = _versions_desc($m);
+    my ($prev) = grep { semver_cmp($_, $m->{latest}) < 0 } @desc;
+    die "no prior build to roll back to\n" unless defined $prev;
+    $m->{latest} = $prev;
+    return ($m, $prev);
+}
+
 1;
