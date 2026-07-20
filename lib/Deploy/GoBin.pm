@@ -1,6 +1,8 @@
 package Deploy::GoBin;
 
 use Mojo::Base -base, -signatures;
+use YAML::XS qw(Dump);
+use Path::Tiny qw(path);
 
 has [qw(repo gobin secrets runner s3 log exec)];
 
@@ -33,6 +35,53 @@ sub resolve_version ($self, %opt) {
         die "version $version must be newer than the current latest $latest\n";
     }
     return $version;
+}
+
+our @DEFAULT_TARGETS = qw(linux/amd64 linux/arm64 darwin/arm64 darwin/amd64 windows/amd64);
+
+sub _targets ($self) {
+    my $t = $self->gobin->{targets};
+    return (ref $t eq 'ARRAY' && @$t) ? @$t : @DEFAULT_TARGETS;
+}
+
+sub goreleaser_yaml ($self, $version) {
+    my $b = $self->gobin;
+    my (%os, %arch);
+    for my $t ($self->_targets) {
+        my ($o, $a) = split m{/}, $t, 2;
+        $os{$o} = 1; $arch{$a} = 1;
+    }
+    my $doc = {
+        version      => 2,
+        project_name => $b->{name},
+        builds => [{
+            id       => $b->{name},
+            binary   => $b->{name},
+            main     => $b->{main} // '.',
+            env      => ['CGO_ENABLED=0'],
+            ldflags  => ['-s -w -X ' . $b->{version_var} . '=' . $version],
+            goos     => [sort keys %os],
+            goarch   => [sort keys %arch],
+        }],
+        archives => [{ id => $b->{name}, formats => ['tar.gz'] }],
+        checksum => { name_template => 'SHA256SUMS', algorithm => 'sha256' },
+        signs    => [{
+            id        => 'ed25519',
+            artifacts => 'all',
+            cmd       => 'gobin-sign',
+            args      => ['${artifact}'],
+        }],
+    };
+    return Dump($doc);
+}
+
+sub resolve_config_path ($self, $version, %opt) {
+    my $dir = $opt{dir} // $self->repo;
+    my $checked_in = path($dir, '.goreleaser.yaml');
+    return ($checked_in->stringify, 0) if $checked_in->exists;
+    my $gen = path($dir, '.goreleaser.generated.yaml');
+    $gen->spew_utf8($self->goreleaser_yaml($version));
+    return ($gen->stringify, 1);
 }
 
 1;
