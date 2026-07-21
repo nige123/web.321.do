@@ -288,4 +288,32 @@ sub release ($self, %opt) {
              live => \%per_arch, verified => $verified };
 }
 
+# --- rollback (kill-switch) + status --------------------------------------
+
+sub rollback ($self) {
+    my $m = $self->live_manifest or die "no live manifest to roll back\n";
+    my ($m2, $prev) = $self->manifest_rollback($m);   # dies "no prior build" before any write
+    $self->s3->put(key => $self->_manifest_key, content => encode_json($m2));
+    return ($prev, $m2);
+}
+
+sub status ($self) {
+    my $meta_path = path($self->repo, 'dist', 'gobin-meta.json');
+    my $meta = $meta_path->exists ? decode_json($meta_path->slurp_utf8) : {};
+    my $live = $self->live_manifest;
+    my $live_latest = $live ? $live->{latest} : undef;
+
+    my %arches;
+    $arches{$_}{built} = 1 for keys %{ $meta->{checksums} // {} };
+    if ($live_latest && $live->{builds}{$live_latest}) {
+        $arches{$_}{live} = 1 for keys %{ $live->{builds}{$live_latest} };
+    }
+    for my $a (values %arches) {
+        $a->{built} //= 0;
+        $a->{live}  //= 0;
+    }
+
+    return { built => $meta->{version}, live => $live_latest, arches => \%arches };
+}
+
 1;
