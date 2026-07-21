@@ -71,6 +71,12 @@ sub goreleaser_yaml ($self, $version) {
             artifacts => 'all',
             cmd       => 'gobin-sign',
             args      => ['${artifact}'],
+            # GoReleaser scrubs the sign-hook environment; a bare name in the
+            # env list forwards that variable straight through from the
+            # ambient env (321 sets it), untemplated - so the multiline PEM
+            # passes intact, unlike "{{ .Env.X }}" which goreleaser can't
+            # resolve for the hook.
+            env       => ['GOBIN_SIGNING_KEY'],
         }],
     };
     return Dump($doc);

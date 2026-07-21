@@ -23,6 +23,10 @@ subtest 'generated config carries the required build knobs' => sub {
     is_deeply [sort @{ $b->{goarch} }], [sort qw(amd64 arm64)],          'default arches';
     is $doc->{checksum}{name_template}, 'SHA256SUMS', 'checksum file name';
     ok $doc->{signs}, 'a signs block exists';
+    is $doc->{signs}[0]{cmd}, 'gobin-sign', 'signs calls the ed25519 shim';
+    # GoReleaser scrubs the sign-hook env; a bare name forwards it through.
+    ok +(grep { $_ eq 'GOBIN_SIGNING_KEY' } @{ $doc->{signs}[0]{env} }),
+        'signs block forwards GOBIN_SIGNING_KEY into the scrubbed hook env';
 };
 
 subtest 'explicit targets narrow the matrix' => sub {
