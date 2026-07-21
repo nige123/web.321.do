@@ -3,6 +3,7 @@ package Deploy::GoBin;
 use Mojo::Base -base, -signatures;
 use YAML::XS qw(Dump);
 use Path::Tiny qw(path);
+use Mojo::JSON qw(encode_json);
 
 has [qw(repo gobin secrets runner s3 log exec)];
 
@@ -114,5 +115,94 @@ sub manifest_rollback ($self, $m) {
     $m->{latest} = $prev;
     return ($m, $prev);
 }
+
+# --- make (build + sign) --------------------------------------------------
+
+sub preflight_make ($self, %opt) {
+    my @problems;
+    my $git   = $opt{git}   // $self->_default_git;
+    my $which = $opt{which} // \&_which;
+
+    my $st = $git->('git status --porcelain');
+    push @problems, 'working tree is not clean (commit or stash uncommitted changes first)'
+        if !$st->{ok} || ($st->{output} // '') =~ /\S/;
+
+    my $version = eval { $self->resolve_version(%opt) };
+    push @problems, ($@ =~ s/\n$//r) if $@;
+
+    push @problems, "'go' not found on PATH"        unless $which->('go');
+    push @problems, "'goreleaser' not found on PATH" unless $which->('goreleaser');
+
+    my $key = $self->gobin->{sign_key};
+    push @problems, "signing key '@{[ $key // '(unset)' ]}' missing from conf/secrets.conf"
+        unless $key && ($self->secrets // {})->{$key};
+
+    return \@problems;
+}
+
+sub make ($self, %opt) {
+    my $git = $opt{git} // $self->_default_git;
+    if (my @p = @{ $self->preflight_make(%opt) }) {
+        die "cannot make:\n" . join('', map { "  - $_\n" } @p);
+    }
+    my $version       = $self->resolve_version(%opt);
+    my $min_supported = $opt{min_supported} // $opt{latest} // $version;
+
+    my $tag = "v$version";
+    my $t = $git->("git tag -a $tag -m 'Release $tag'");
+    die "git tag failed: $t->{output}\n" unless $t->{ok};
+    my $p = $git->("git push origin $tag");
+    die "git push failed: $p->{output}\n" unless $p->{ok};
+
+    my ($config, $generated) = $self->resolve_config_path($version, dir => $self->repo);
+    my $env = {
+        CGO_ENABLED       => 0,
+        GOBIN_SIGNING_KEY => $self->secrets->{ $self->gobin->{sign_key} },
+    };
+    my $run = $self->runner->run(dir => $self->repo, config => $config, env => $env);
+    die "goreleaser failed: $run->{output}\n" unless $run->{ok};
+
+    my $checksums = $self->_read_checksums(path($self->repo, 'dist'));
+    my $meta = { version => $version, min_supported => $min_supported, checksums => $checksums };
+    my $meta_path = path($self->repo, 'dist', 'gobin-meta.json');
+    $meta_path->spew_utf8(encode_json($meta));
+
+    return { version => $version, config => $config, generated => $generated,
+             meta_path => "$meta_path" };
+}
+
+# artifact "<name>_<os>_<arch>.tar.gz" in SHA256SUMS -> { "<os>/<arch>" => sha }
+sub _read_checksums ($self, $dist) {
+    my $sums = path($dist, 'SHA256SUMS');
+    return {} unless $sums->exists;
+    my %out;
+    for my $line (split /\n/, $sums->slurp_utf8) {
+        next unless $line =~ /^(\S+)\s+\*?(\S+)$/;
+        my ($sha, $file) = ($1, $2);
+        next unless $file =~ /_([a-z0-9]+)_([a-z0-9]+)\.(?:tar\.gz|zip)$/;
+        $out{"$1/$2"} = $sha;
+    }
+    return \%out;
+}
+
+sub _default_git ($self) {
+    require Deploy::Local;
+    my $local = Deploy::Local->new;
+    my $repo  = $self->repo;
+    return sub ($cmd) { $local->run_in_dir($repo, $cmd) };
+}
+
+sub _which ($prog) { return (`command -v $prog 2>/dev/null` =~ /\S/) ? 1 : 0 }
+
+# --- secrets loading ------------------------------------------------------
+
+sub load_secrets ($repo) {
+    my $file = "$repo/conf/secrets.conf";
+    return {} unless -f $file;
+    my $h = do $file;
+    return (ref $h eq 'HASH') ? $h : {};
+}
+
+sub live_latest ($self) { return undef }   # real S3 read arrives in Task 6
 
 1;
