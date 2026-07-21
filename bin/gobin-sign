@@ -1,0 +1,17 @@
+#!/bin/bash
+
+# gobin-sign <artifact> - detached ed25519 signature for a 321 gobin artifact.
+# Invoked per artifact by the signs block of the generated .goreleaser.yaml.
+# The private key arrives ONLY via $GOBIN_SIGNING_KEY (PEM in the env);
+# process substitution keeps it off disk and off argv. Output is
+# <artifact>.sig - a raw signature the 123 self-updater verifies against its
+# embedded public key.
+
+set -euo pipefail
+
+[ $# -eq 1 ] || { echo "usage: gobin-sign <artifact>" >&2; exit 2; }
+[ -n "${GOBIN_SIGNING_KEY:-}" ] || { echo "gobin-sign: GOBIN_SIGNING_KEY not set" >&2; exit 3; }
+
+exec openssl pkeyutl -sign -rawin \
+    -inkey <(printf '%s\n' "$GOBIN_SIGNING_KEY") \
+    -in "$1" -out "$1.sig"
