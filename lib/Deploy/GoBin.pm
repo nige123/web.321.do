@@ -3,7 +3,7 @@ package Deploy::GoBin;
 use Mojo::Base -base, -signatures;
 use YAML::XS qw(Dump);
 use Path::Tiny qw(path);
-use Mojo::JSON qw(encode_json);
+use Mojo::JSON qw(encode_json decode_json);
 
 has [qw(repo gobin secrets runner s3 log exec)];
 
@@ -203,6 +203,89 @@ sub load_secrets ($repo) {
     return (ref $h eq 'HASH') ? $h : {};
 }
 
-sub live_latest ($self) { return undef }   # real S3 read arrives in Task 6
+# --- release (upload + manifest read-modify-write + verify) ---------------
+
+sub _manifest_key ($self) { $self->gobin->{s3}{prefix} . '/version.json' }
+
+sub live_manifest ($self) {
+    my $r = $self->s3->get(key => $self->_manifest_key);
+    return undef unless $r->{ok} && defined $r->{content};
+    return decode_json($r->{content});
+}
+
+sub live_latest ($self) {
+    my $m = $self->live_manifest;
+    return $m ? $m->{latest} : undef;
+}
+
+# dist/ artifacts named "<name>_<os>_<arch>.tar.gz" (or .zip)
+sub _dist_artifacts ($self) {
+    my $dist = path($self->repo, 'dist');
+    return () unless $dist->exists;
+    my @arts;
+    for my $f (sort { "$a" cmp "$b" } $dist->children(qr/\.(?:tar\.gz|zip)$/)) {
+        my ($os, $arch) = ($f->basename =~ /_([a-z0-9]+)_([a-z0-9]+)\.(?:tar\.gz|zip)$/) or next;
+        push @arts, { file => "$f", name => $f->basename, os => $os, arch => $arch };
+    }
+    return @arts;
+}
+
+sub preflight_release ($self, $version) {
+    my @problems;
+    push @problems, "nothing built for $version - run '321 gobin make' first"
+        unless $self->_dist_artifacts;
+    my $s = $self->secrets // {};
+    push @problems, 'S3 credentials missing from conf/secrets.conf'
+        unless $s->{s3_access_key_id} && $s->{s3_secret_access_key};
+    return \@problems;
+}
+
+sub release ($self, %opt) {
+    my $meta_path = path($self->repo, 'dist', 'gobin-meta.json');
+    my $meta = $meta_path->exists ? decode_json($meta_path->slurp_utf8) : {};
+    my $version = $opt{version} // $meta->{version};
+    die "no version to release: pass one or run '321 gobin make' first\n" unless $version;
+
+    if (my @p = @{ $self->preflight_release($version) }) {
+        die "cannot release:\n" . join('', map { "  - $_\n" } @p);
+    }
+
+    my $prefix = $self->gobin->{s3}{prefix};
+    my $checks = $meta->{checksums} // {};
+    my (%per_arch, @uploaded);
+    for my $a ($self->_dist_artifacts) {
+        my $base = "$prefix/$version/$a->{name}";
+        $self->s3->put(key => $base,       file => $a->{file},
+                       content_type => 'application/gzip');
+        $self->s3->put(key => "$base.sig", file => "$a->{file}.sig",
+                       content_type => 'application/octet-stream');
+        push @uploaded, $base, "$base.sig";
+        $per_arch{"$a->{os}/$a->{arch}"} = {
+            url    => $base,
+            sha256 => $checks->{"$a->{os}/$a->{arch}"},
+            sig    => "$base.sig",
+        };
+    }
+
+    # Manifest is written once, last, after all uploads succeeded.
+    my $manifest = $self->live_manifest // empty_manifest($self->gobin->{name});
+    $self->manifest_add_build($manifest,
+        version => $version, arches => \%per_arch,
+        min_supported => $meta->{min_supported});
+    $self->manifest_prune($manifest, $self->gobin->{retain} // 5);
+    $self->s3->put(key => $self->_manifest_key, content => encode_json($manifest));
+
+    # Verify: re-fetch the manifest and HEAD every url + sig it now claims.
+    my $verified = 1;
+    my $live = $self->live_manifest;
+    for my $arch (keys %{ $live->{builds}{$version} // {} }) {
+        my $b = $live->{builds}{$version}{$arch};
+        $verified = 0 unless $self->s3->head(key => $b->{url})->{ok};
+        $verified = 0 unless $self->s3->head(key => $b->{sig})->{ok};
+    }
+
+    return { version => $version, uploaded => \@uploaded,
+             live => \%per_arch, verified => $verified };
+}
 
 1;
