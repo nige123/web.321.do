@@ -8,8 +8,11 @@ use Deploy::GoBin::S3;
 has description => 'Build, sign, and release cross-arch Go binaries';
 has usage => sub ($self) { $self->extract_usage };
 
+my %VERB = map { $_ => 1 } qw(make release rollback status);
+
 sub run ($self, @args) {
     my $verb = shift @args // '';
+    die $self->usage unless $VERB{$verb};
     my %o = $self->_parse_flags(@args);
 
     my $name = $self->_infer_service
@@ -21,11 +24,10 @@ sub run ($self, @args) {
 
     my $gobin = $self->_gobin_for($svc, $block);
 
-    return $self->_make($gobin, %o)           if $verb eq 'make';
-    return $self->_release($gobin, %o)        if $verb eq 'release';
-    return $self->_rollback($gobin)           if $verb eq 'rollback';
-    return $self->_status($gobin)             if $verb eq 'status';
-    die $self->usage;
+    return $self->_make($gobin, %o)    if $verb eq 'make';
+    return $self->_release($gobin, %o) if $verb eq 'release';
+    return $self->_rollback($gobin)    if $verb eq 'rollback';
+    return $self->_status($gobin);
 }
 
 sub _parse_flags ($self, @args) {
