@@ -97,6 +97,10 @@ All JSON responses follow `{ status, message, data }`.
 321 install <service>      # first-time: clone + cpanm + ubic + nginx + certbot
 321 generate               # regenerate all ubic service files + symlinks
 321 do [service] <target> <subcommand> [args]   # run an app's own Mojo subcommand at a target
+321 gobin make [--bump L|--version X.Y.Z] [--min-supported X.Y.Z]   # build + sign Go binaries into dist/
+321 gobin release [version]  # upload dist/ to S3 + update version.json
+321 gobin rollback           # re-point version.json latest to the previous build
+321 gobin status             # built-locally vs live-latest, per arch
 ```
 
 Service-name arguments accept prefix/substring matches (see `Deploy::Command::resolve_service`).
@@ -166,6 +170,35 @@ live:
 **Secrets are the service repo's responsibility, not 321's.** Each app loads its own secrets however it wants (its own config file, an environment loader at startup, etc.). 321 only passes through whatever non-sensitive env vars the target block declares under `env:`.
 
 If a target's hypnotoad runner needs to listen on a specific port, the app's production config must set `hypnotoad => { listen => ['http://*:PORT'] }` to match the manifest port — 321 can't pass it on the command line. A mismatch shows up as a `port_check` failure with the actual bound port in the hint.
+
+### Go binaries (`gobin:` block)
+
+A repo that ships a Go binary via `321 gobin` adds a `gobin:` block to its
+`321.yml` (see `docs/superpowers/specs/2026-07-20-321-gobin-design.md` for
+the full design and the `version.json` format):
+
+```yaml
+gobin:
+  name: 123                    # binary + artifact base name
+  main: .                      # Go package to build
+  version_var: main.version    # ldflag target for the stamped version
+  s3: { bucket: 123do-releases, prefix: bin/123 }
+  sign_key: gobin_signing_key  # ed25519 private key name in conf/secrets.conf
+  retain: 5                    # past builds kept in the manifest
+```
+
+`make` cross-compiles the five-platform matrix (override with `targets:`)
+with `CGO_ENABLED=0`, stamps the version via ldflags, signs each artifact
+(ed25519, key from `conf/secrets.conf`, never logged), and writes
+`dist/gobin-meta.json`. `release` uploads to immutable version-scoped S3
+keys and read-modify-writes `version.json` (adding the build, advancing
+`latest`, carrying `min_supported`, pruning past `retain`), then verifies
+every URL and signature. `rollback` re-points `latest` to the previous
+build (byte-free kill-switch). A checked-in `.goreleaser.yaml` overrides
+generation; the `gobin:` block still supplies `s3`/`sign_key`/`retain`.
+Implemented as `Deploy::Command::gobin` over the `Deploy::GoBin` pipeline,
+with GoReleaser (`Deploy::GoBin::Runner`) and S3 (`Deploy::GoBin::S3`)
+behind injectable seams.
 
 ### Hot deploys, the health gate, and pid_file
 
