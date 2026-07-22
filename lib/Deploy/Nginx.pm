@@ -2,7 +2,45 @@ package Deploy::Nginx;
 
 use Mojo::Base -base, -signatures;
 use Path::Tiny qw(path);
+use Time::Piece;
 use Deploy::CertProvider;
+
+# Days from now until an openssl notAfter date ("Oct 18 17:33:59 2026 GMT").
+# undef if the string can't be parsed. Pure - unit tested.
+sub _days_until ($enddate) {
+    return undef unless defined $enddate;
+    (my $s = $enddate) =~ s/\s*GMT\s*$//i;
+    $s =~ s/\s+/ /g;
+    $s =~ s/^\s+|\s+$//g;
+    my $t = eval { Time::Piece->strptime($s, '%b %d %H:%M:%S %Y') };
+    return undef if $@ || !$t;
+    return int(($t->epoch - time) / 86400);
+}
+
+# Classify a served cert from host + its CN/SANs + days-until-expiry. The
+# renewal window is 30 days (the certbot convention). `ok` means the cert is
+# currently serviceable (matches the host and not expired); `expiring` is the
+# separate "renew soon" signal. Pure - unit tested.
+sub _cert_verdict ($host, $cn, $sans, $days) {
+    my @candidates = grep { defined && length } ($cn, @$sans);
+    my $host_match = (grep { lc($_) eq lc($host) } @candidates) ? 1 : 0;
+    my $expired  = (defined $days && $days <= 0)              ? 1 : 0;
+    my $expiring = (defined $days && $days > 0 && $days < 30) ? 1 : 0;
+
+    my $error;
+    if    (!$host_match) { $error = "cert is for " . ($cn // 'unknown') . ", not $host" }
+    elsif ($expired)     { $error = "certificate expired " . abs($days) . " day(s) ago" }
+    elsif ($expiring)    { $error = "certificate expires in $days days" }
+
+    return {
+        ok             => ($host_match && !$expired) ? 1 : 0,
+        host_match     => $host_match,
+        expired        => $expired,
+        expiring       => $expiring,
+        days_remaining => $days,
+        ($error ? (error => $error) : ()),
+    };
+}
 
 has 'config';     # Deploy::Config instance
 has 'log';        # Mojo::Log instance (optional)
@@ -226,33 +264,44 @@ sub status ($self, $name) {
 }
 
 sub probe_cert ($self, $host) {
-    return { ok => 0, host => $host, error => 'invalid host' }
+    return { ok => 0, host => $host, error => 'invalid host', reachable => 0 }
         unless $self->_valid_host($host);
 
-    my $cmd = "timeout 3 openssl s_client -servername $host -connect $host:443 "
-            . "-verify_return_error </dev/null 2>/dev/null "
-            . "| openssl x509 -noout -subject -ext subjectAltName 2>/dev/null";
-    my $out = `$cmd`;
+    # Read the served cert WITHOUT chain verification, so an expired or wrong
+    # cert is still inspectable (that is the whole point - we compute validity
+    # ourselves from notAfter). Subject, SANs and the expiry date in one pass.
+    my $connect = "timeout 5 openssl s_client -servername $host -connect $host:443 </dev/null 2>/dev/null";
+    my $x509    = "openssl x509 -noout -subject -ext subjectAltName -enddate 2>/dev/null";
+    my $out = `$connect | $x509`;
 
-    return { ok => 0, host => $host, error => 'no TLS response' }
-        unless $out =~ /\S/;
+    unless ($out =~ /\S/) {
+        # No cert came back - distinguish a dead socket from a TLS failure so
+        # doctor points at the right layer.
+        my $diag = `timeout 5 openssl s_client -servername $host -connect $host:443 </dev/null 2>&1`;
+        my $error = $diag =~ /connect:|Connection refused|No route to host|timed out|unable to connect/i
+            ? 'no TCP/TLS response (host unreachable on 443)'
+            : 'TLS handshake failed (no certificate served)';
+        return { ok => 0, host => $host, reachable => 0, error => $error };
+    }
 
     my ($cn) = $out =~ /subject=.*?CN\s*=\s*([^\s,]+)/;
     my @sans;
-    if ($out =~ /Subject Alternative Name:\s*\n\s*(.+)/) {
+    if ($out =~ /Subject Alternative Name:\s*\n?\s*(.+)/) {
         @sans = map { (my $s = $_) =~ s/^DNS://; $s =~ s/^\s+|\s+$//g; $s }
                 split /,/, $1;
     }
+    my ($enddate) = $out =~ /notAfter=(.+)/;
+    $enddate =~ s/\s+$// if defined $enddate;
+    my $days = _days_until($enddate);
 
-    my @candidates = grep { defined && length } ($cn, @sans);
-    my $matches = grep { lc($_) eq lc($host) } @candidates;
-
+    my $verdict = _cert_verdict($host, $cn, \@sans, $days);
     return {
-        ok      => $matches ? 1 : 0,
-        host    => $host,
-        cn      => $cn,
-        sans    => \@sans,
-        $matches ? () : (error => "cert is for " . ($cn // 'unknown') . ", not $host"),
+        %$verdict,
+        host      => $host,
+        cn        => $cn,
+        sans      => \@sans,
+        reachable => 1,
+        not_after => $enddate,
     };
 }
 
