@@ -23,26 +23,47 @@ sub run ($self, @args) {
         push @rows, { name => $name, host => $host, probe => $probe };
     }
 
-    my $bad = grep { !$_->{probe}{ok} } @rows;
-    say "Checked " . scalar(@rows) . " host(s) on $target target ("
-        . ($bad ? "\e[31m$bad failing\e[0m" : "\e[32mall good\e[0m") . ")";
+    my ($fail, $warn) = (0, 0);
+    for my $row (@rows) {
+        my ($tier, $msg) = _tier($row->{probe});
+        $row->{tier} = $tier;
+        $row->{msg}  = $msg;
+        $fail++ if $tier eq 'fail';
+        $warn++ if $tier eq 'warn';
+    }
+
+    my @summary;
+    push @summary, "\e[31m$fail failing\e[0m"  if $fail;
+    push @summary, "\e[33m$warn expiring\e[0m"  if $warn;
+    push @summary, "\e[32mall good\e[0m"        unless @summary;
+    say "Checked " . scalar(@rows) . " host(s) on $target target (" . join(', ', @summary) . ")";
     say "";
 
     for my $row (@rows) {
-        my $p = $row->{probe};
-        if ($p->{ok}) {
-            printf "  \e[32m[OK]\e[0m   %-30s %s\n", $row->{name}, $row->{host};
-        } else {
-            printf "  \e[31m[FAIL]\e[0m %-30s %s\n", $row->{name}, $row->{host};
-            say   "         $p->{error}" if $p->{error};
-            say   "         Fix: 321 go $row->{name} $target" unless $p->{error} && $p->{error} =~ /no TLS/;
-        }
+        my %label = (ok => "\e[32m[OK]\e[0m  ", warn => "\e[33m[WARN]\e[0m", fail => "\e[31m[FAIL]\e[0m");
+        printf "  %s %-30s %s\n", $label{ $row->{tier} }, $row->{name}, $row->{host};
+        next if $row->{tier} eq 'ok';
+        say "         $row->{msg}" if $row->{msg};
+        # 321 go can renew/repair a cert; it cannot fix an unreachable host.
+        say "         Fix: 321 go $row->{name} $target" if $row->{probe}{reachable} // 1;
     }
 
     my $inc_bad = $self->_audit_inc;
 
-    exit 1 if $bad || $inc_bad;
+    exit 1 if $fail || $warn || $inc_bad;
 }
+
+# Classify a probe_cert result into (tier, message). 'warn' = a valid cert
+# inside the 30-day renewal window (renew soon); 'fail' = expired, wrong host,
+# or unreachable. Pure - unit tested.
+sub _tier ($probe) {
+    return ('fail', $probe->{error} // 'no valid certificate') unless $probe->{ok};
+    return ('warn', "certificate expires in $probe->{days_remaining} days") if $probe->{expiring};
+    my $d = $probe->{days_remaining};
+    return ('ok', defined $d ? "valid, $d days left" : 'valid');
+}
+
+sub _needs_attention ($tier) { return ($tier eq 'fail' || $tier eq 'warn') ? 1 : 0 }
 
 # Audit every service repo's bin/*.pl for the fragile @INC glob (see
 # scan_inc). Source-only - target-independent - so it works on dev too.
@@ -105,10 +126,12 @@ sub scan_inc ($class, $text) {
   Usage: APPLICATION doctor [target]
 
   Probes every non-localhost service host on the target (default: live)
-  and reports any cert that doesn't match its hostname. Then audits every
-  service repo's bin/*.pl for the fragile @INC glob (globbing the whole
-  local/lib/perl5 tree onto @INC, which shadows core Config). Exit code is
-  non-zero when any check fails - wire it into a cron if you want alerts.
+  and reports each cert as OK, WARN (valid but expiring within 30 days),
+  or FAIL (expired, wrong host, or unreachable - the message names which
+  layer). Then audits every service repo's bin/*.pl for the fragile @INC
+  glob (globbing the whole local/lib/perl5 tree onto @INC, which shadows
+  core Config). Exit code is non-zero when any cert is failing OR expiring,
+  so a cron catches a cert BEFORE it lapses.
 
   321 doctor             # check live
   321 doctor live        # explicit
