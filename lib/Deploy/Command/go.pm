@@ -118,14 +118,20 @@ sub _ensure_serving ($self, $name, $target, $transport) {
     $self->nginx->transport($transport);
     my $st = $self->nginx->status($name) // {};
 
+    # On live a present cert file is not enough: probe what's actually served
+    # so an expired / expiring / wrong-host cert is caught and renewed. dev
+    # (mkcert) trusts the file. undef probe means "not checked" -> treat as
+    # renew, never as good.
+    my $probe = ($target ne 'dev' && $st->{ssl}) ? $self->nginx->probe_cert($host) : undef;
+    my $need_cert = $self->_needs_cert($target, $st, $probe);
+
+    if ($st->{config_exists} && $st->{enabled} && !$need_cert) {
+        return;   # fully wired and the cert is valid, outside the renewal window
+    }
+
     if ($st->{config_exists} && $st->{enabled} && $st->{ssl}) {
-        # Fully wired. On live, still confirm the cert matches the host
-        # (catches a stale cert from a previous hostname); dev mkcert is fine.
-        return if $target eq 'dev';
-        my $probe = $self->nginx->probe_cert($host);
-        return if $probe->{ok};
         say "";
-        say "  \e[33mSSL: $probe->{error}\e[0m" if $probe->{error};
+        say "  \e[33mSSL: $probe->{error}\e[0m" if $probe && $probe->{error};
         say "  Repairing nginx + SSL for $host...";
     }
     else {
@@ -148,8 +154,9 @@ sub _ensure_serving ($self, $name, $target, $transport) {
     }
 
     my $provider = $self->nginx->cert_provider->pick($target);
-    unless ($st->{ssl}) {
-        say "  Requesting SSL certificate via $provider...";
+    if ($need_cert) {
+        my $why = $st->{ssl} ? 'renewing' : 'requesting';
+        say "  $why SSL certificate via $provider...";
         my $cert = $self->nginx->acquire_cert($name);
         if ($cert->{status} eq 'ok') {
             say "  [OK] SSL ($provider)";
@@ -163,8 +170,9 @@ sub _ensure_serving ($self, $name, $target, $transport) {
             return;
         }
         else {
-            say "  [SKIP] certbot failed - point DNS for $host at the server, then:";
-            say "    321 nginx $name $target";
+            say "  [SKIP] certbot failed:";
+            say "  $_" for grep { length } split /\n/, ($cert->{output} // '');
+            say "  (if DNS for $host isn't pointed at the server yet, fix that and re-run: 321 nginx $name $target)";
             return;
         }
     }

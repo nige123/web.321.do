@@ -188,6 +188,21 @@ sub ensure_fresh_ubic ($self, $name, $transport) {
     say "  [regenerated ubic for $name]" if $r && $r->{status} eq 'ok';
 }
 
+# Does this host need a cert (re)issued? Shared by `321 go` and `321 nginx`.
+# Presence of a cert file is not enough - on live a present cert can be
+# expired, expiring within the renewal window, for the wrong host, or the host
+# may be unreachable, and every one of those needs certbot to run again. On dev
+# (mkcert) a present file is enough. $probe is a Deploy::Nginx::probe_cert
+# result (or undef when we could not / did not probe - treated as "renew", so a
+# missing probe never masks a bad cert).
+sub _needs_cert ($self, $target, $st, $probe) {
+    return 1 unless $st->{ssl};              # no cert file at all
+    return 0 if $target eq 'dev';            # mkcert file present is enough
+    return 1 unless $probe && $probe->{ok};  # unreachable / expired / mismatch
+    return 1 if $probe->{expiring};          # inside the 30-day window
+    return 0;
+}
+
 sub check_port ($self, $port, $transport) {
     return 0 unless $port && $port ne '?';
     # Any HTTP response means the socket is alive; -f would falsely fail
