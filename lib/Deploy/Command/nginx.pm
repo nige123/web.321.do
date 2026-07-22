@@ -36,9 +36,16 @@ sub run ($self, @args) {
     say "  enabled: " . ($status->{enabled} ? "\e[32myes\e[0m" : "\e[31mno\e[0m");
     say "  ssl:     " . ($status->{ssl} ? "\e[32m$status->{provider}\e[0m" : "\e[31mnone\e[0m");
 
-    if (!$force && $status->{config_exists} && $status->{enabled} && $status->{ssl}) {
+    # On live, presence of a cert file is not enough - probe what's served so
+    # an expired / expiring / wrong-host cert is caught. dev (mkcert) trusts
+    # the file.
+    my $probe = ($target ne 'dev' && $status->{ssl}) ? $self->nginx->probe_cert($host) : undef;
+    say "  cert:    " . ($probe ? _cert_summary($probe) : ($status->{ssl} ? 'present' : 'none'));
+    my $need_cert = $force || $self->_needs_cert($target, $status, $probe);
+
+    if (!$need_cert && $status->{config_exists} && $status->{enabled} && $status->{ssl}) {
         say "";
-        say "  \e[32mNginx fully configured.\e[0m  (use --force to regenerate)";
+        say "  \e[32mNginx fully configured, cert valid.\e[0m  (use --force to regenerate)";
         return;
     }
 
@@ -58,11 +65,13 @@ sub run ($self, @args) {
         }
     }
 
-    # SSL cert. With aliases configured, always ask - acquire_cert is
-    # idempotent and expands an existing cert that doesn't cover them yet.
-    if (!$status->{ssl} || @aliases) {
+    # Acquire when the cert is missing / expired / expiring / wrong-host, when
+    # aliases were added (acquire_cert is idempotent and expands the SAN list),
+    # or whenever --force is given (the operator explicitly asked).
+    if ($need_cert || @aliases) {
         my $provider = $self->nginx->cert_provider->pick($target);
-        say "  Requesting SSL certificate via $provider...";
+        my $verb = ($status->{ssl} && $target ne 'dev') ? 'Renewing' : 'Requesting';
+        say "  $verb SSL certificate via $provider...";
         my $cert = $self->nginx->acquire_cert($name);
         if ($cert->{status} eq 'ok') {
             say "  [OK] SSL cert ready ($provider)";
@@ -79,13 +88,24 @@ sub run ($self, @args) {
                 say "    mkcert -install";
                 say "  Then re-run: 321 nginx $name" . $self->target_flag($target);
             } else {
-                say "  [SKIP] certbot failed - DNS may not be pointed yet";
+                say "  [FAIL] certbot failed:";
+                say "  $_" for grep { length } split /\n/, ($cert->{output} // '');
                 say "";
-                say "  Next: point DNS for $host to the server, then:";
-                say "    321 nginx $name $target";
+                say "  (if DNS for $host isn't pointed at the server yet, fix that and re-run:";
+                say "    321 nginx $name $target)";
             }
         }
     }
+}
+
+# One-line human summary of a probe_cert result for the status block.
+sub _cert_summary ($probe) {
+    return "\e[31munreachable\e[0m ($probe->{error})" unless $probe->{reachable};
+    return "\e[31mexpired\e[0m ($probe->{error})"     if $probe->{expired};
+    return "\e[31mwrong host\e[0m ($probe->{error})"  unless $probe->{host_match} // 1;
+    return "\e[33mexpiring\e[0m ($probe->{days_remaining} days left)" if $probe->{expiring};
+    my $days = $probe->{days_remaining};
+    return "\e[32mvalid\e[0m" . (defined $days ? " ($days days left)" : "");
 }
 
 1;
