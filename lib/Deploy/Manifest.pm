@@ -8,7 +8,7 @@ my %VALID_RUNNER = map { $_ => 1 } qw(hypnotoad morbo script);
 
 my %IDENTITY_KEY = map { $_ => 1 } qw(
     name entry runner perl health branch repo test
-    apt_deps favicon workers force_https pid_file gobin
+    apt_deps favicon workers force_https pid_file gobin client_max_body_size
 );
 
 sub load ($class, $repo_dir) {
@@ -51,6 +51,7 @@ sub load ($class, $repo_dir) {
         ($raw->{favicon} ? (favicon => $raw->{favicon}) : ()),
         ($raw->{workers} ? (workers => $raw->{workers}) : ()),
         ($raw->{gobin}   ? (gobin   => $raw->{gobin})   : ()),
+        (exists $raw->{client_max_body_size} ? (client_max_body_size => $raw->{client_max_body_size}) : ()),
         (exists $raw->{force_https} ? (force_https => $raw->{force_https}) : ()),
     };
 }

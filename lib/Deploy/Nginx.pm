@@ -87,6 +87,15 @@ sub generate ($self, $name) {
         return { status => 'error', message => "Invalid alias: $alias" } unless $self->_valid_host($alias);
     }
 
+    my $client_max_body_size = $svc->{client_max_body_size};
+    if (defined $client_max_body_size
+        && $client_max_body_size !~ /\A[1-9]\d*[kmg]\z/i) {
+        return {
+            status  => 'error',
+            message => "Invalid client_max_body_size: $client_max_body_size",
+        };
+    }
+
     my $provider = $self->cert_provider->pick($self->config->target);
     my $paths    = $self->cert_provider->cert_paths(provider => $provider, host => $host);
     # /etc/letsencrypt/live/ is root-readable; sudo so unprivileged probes work.
@@ -95,7 +104,7 @@ sub generate ($self, $name) {
     # force_https defaults true: HTTP redirects to HTTPS when SSL is set up.
     # Set force_https: false in 321.yml for APIs that should answer on HTTP too.
     my $force_https = $svc->{force_https} // 1;
-    my $conf = $self->_render_config($host, $port, $has_ssl, $paths, $force_https, \@aliases);
+    my $conf = $self->_render_config($host, $port, $has_ssl, $paths, $force_https, \@aliases, $client_max_body_size);
 
     my $dest = $self->sites_available . "/$host";
 
@@ -305,9 +314,13 @@ sub probe_cert ($self, $host) {
     };
 }
 
-sub _render_config ($self, $host, $port, $has_ssl, $paths, $force_https = 1, $aliases = []) {
+sub _render_config ($self, $host, $port, $has_ssl, $paths, $force_https = 1, $aliases = [], $client_max_body_size = undef) {
     my $names = join ' ', $host, @$aliases;
+    my $body_size = defined $client_max_body_size
+        ? "    client_max_body_size $client_max_body_size;\n"
+        : '';
     my $proxy_block = <<"NGINX";
+$body_size
     access_log /var/log/nginx/${host}.access.log;
     error_log  /var/log/nginx/${host}.error.log;
 

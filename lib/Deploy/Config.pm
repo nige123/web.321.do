@@ -124,6 +124,11 @@ sub _resolve ($self, $name, $manifest) {
         ($manifest->{favicon}  ? (favicon  => $manifest->{favicon})  : ()),
         ($manifest->{gobin}    ? (gobin    => $manifest->{gobin})    : ()),
         (exists $manifest->{force_https} ? (force_https => $manifest->{force_https}) : ()),
+        (exists $target->{client_max_body_size}
+            ? (client_max_body_size => $target->{client_max_body_size})
+            : (exists $manifest->{client_max_body_size}
+                ? (client_max_body_size => $manifest->{client_max_body_size})
+                : ())),
         (($target->{aliases} // $manifest->{aliases}) ? (aliases => $target->{aliases} // $manifest->{aliases}) : ()),
         ($target->{ssh}        ? (ssh      => $target->{ssh})        : ()),
         ($target->{ssh_key}    ? (ssh_key  => $target->{ssh_key})    : ()),
